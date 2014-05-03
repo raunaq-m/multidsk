@@ -1,0 +1,99 @@
+#include "loadKmers.h"
+int totalKmers;
+int smallestKmer ;
+int *Kmerlist;
+int* loadKmers(char *kmerfname) {
+
+	//Load the file containing list of k-mers (assuming kmers entered in decreasing order) 
+	string line;	
+	int count=0,counter=0;
+	ifstream infile(kmerfname);
+	if(!infile.is_open()) {
+		fprintf(stderr, "%s file doesn't exist or failed to load. Please check if kmer list file exists \n",kmerfname);
+	}
+	while(!infile.eof()){
+		getline(infile,line);
+		count++;
+	}
+	fprintf(stderr,"No of kmers asked for computation  %d\n",count-1);
+	infile.close();
+	totalKmers = count-1;
+ 	Kmerlist = new int [count]; 
+	infile.open(kmerfname);
+	while(!infile.eof()){
+		getline(infile,line);
+		Kmerlist[counter++] =atoi(line.c_str()); 
+	}
+	int largestKmer = Kmerlist[0];
+	smallestKmer = Kmerlist[totalKmers-1];
+	fprintf(stderr,"Largest %d, Smallest %d\n",Kmerlist[0],Kmerlist[totalKmers-1]);
+	/*for (counter=0;counter<count-1;counter++) {
+		fprintf(stderr,"%d kmer value\n",Kmerlist[counter]);
+	}*/
+	
+	return Kmerlist;
+}
+
+int reestimate_partitions(int size_of_lmers,uint64_t partition_volume,long * lkmer_counts, long * hash_vals, int * partition_files)
+{
+	//Sort the counts using merge sort, and also maintain the positions of sorted numbers
+	vector<clmer> sorted_lmers;
+	long total_bins = pow(4,size_of_lmers);
+	// make pairs of lmercount and lmer 
+	for (int i=0;i<total_bins;i++)
+		sorted_lmers.push_back(make_pair(i,lkmer_counts[i]));
+	// sort the counts of kmers and maintain their index 
+	sort(sorted_lmers.begin(),sorted_lmers.end(),comparator);
+	uint64_t current_vol=0; int part = 0, iter=0, items_in_cur = 0;
+	for(vector<clmer>::iterator it=sorted_lmers.begin(); it!=sorted_lmers.end();++it)
+	{
+		clmer temp = *it;
+		if(current_vol>=partition_volume/2 || items_in_cur > 5000 )
+		{
+			current_vol = 0;
+			items_in_cur = 1;
+			part++;
+			hash_vals[iter] = temp.first;
+			partition_files[iter]=part;
+		}
+		else
+		{
+			current_vol +=temp.second;
+			items_in_cur++;
+			hash_vals[iter] = temp.first;
+			partition_files[iter]=part;
+		}
+		//printf("kmer count %lu,current vol %lu, kmer %lu, partition file %d\n",temp.second,current_vol,hash_vals[iter],partition_files[iter]);
+		iter++;
+	}
+	// print out lmers their counts and the partition files 
+	iter=0;
+/*	sort(sorted_lmers.begin(),sorted_lmers.end(),comparator);
+	for(vector<clmer>::iterator it=sorted_lmers.begin(); it!=sorted_lmers.end();++it)
+	{
+		clmer temp= *it;
+		printf("kmer count %lu, kmer %lu, partition file %d\n",temp.second,hash_vals[iter],partition_files[iter]);
+		iter++;
+	}
+*/
+	return part+1;
+}
+
+bool comparator(const clmer& l,const clmer& r)
+{
+	return l.second>r.second;
+}
+
+/*int main(int argc, char *argv[]){
+	
+	int i=10;
+	long a1[10],b[10];
+	int c[10];
+	a1[0]=10;a1[1]=30;a1[2]=50;a1[3]=40; a1[4]=90;a1[5]=70;a1[6]=20;a1[7]=60;a1[8]=80;a1[9]=100;
+	for(int j=0;j<i;j++)
+		printf("%lu\n",a1[j]);
+	Sort(10,a1,b,c);
+	for(int j=0;j<i;j++)
+		printf("%lu %lu %d\n",a1[j],b[j],c[j]);
+	return 0;
+}*/

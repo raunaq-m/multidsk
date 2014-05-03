@@ -1,0 +1,12 @@
+#!/bin/bash -l
+
+for iter in 11 21 31 40 50 
+do 
+	nam=${1%.fasta}.kmers.$iter
+	nam1=${1%.fasta}.solid_kmers_binary.$iter
+	con1=${1%.fasta}.kmers_dsk.$iter
+	perl ../parsefna.pl $1 $iter $nam
+	python parse_results.py $nam1 >$con1
+	echo "Comparison of $iter $nam $nam1 $con1"
+	perl ../compare_two.pl $con1 $nam
+done
