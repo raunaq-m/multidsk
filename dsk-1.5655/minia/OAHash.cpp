@@ -100,7 +100,6 @@ inline uint64_t OAHash::hashcode( uint64_t elem )
 
 bool OAHash::is_occupied(element_pair *element)
 {
-    //return !(element->value == 0 || element->value == -1);
     return (!element->value == 0);
 }
 
@@ -199,7 +198,6 @@ bool OAHash::next_iterator()
         iterator++;
         if (iterator == data+hash_size)
             return false;
-        //if ( !(iterator->value == 0 ||iterator->value == -1))
 	if ( !(iterator->value == 0))
             break;
     }
