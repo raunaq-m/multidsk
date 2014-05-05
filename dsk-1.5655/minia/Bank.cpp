@@ -375,7 +375,7 @@ void Bank::close()
     for (int i=0; i<nb_files; i++)
         gzclose(buffered_file[i]->stream);
 }
-void Bank::count_kmers_for_small_value(int l, long *lmer_counts)
+void Bank::count_kmers_for_small_value(int l, double *lmer_counts)
 {
 	printf("Reestimating partitions sizes and number of passes based on %d-mers \n",l);
 	char *rseq;
@@ -430,7 +430,7 @@ void Bank::count_kmers_for_small_value(int l, long *lmer_counts)
 	{
 	//	printf("%d %lu\n",i,lmer_counts[i]);
 		//ensure that each partition file doesn't goes over 0.75 of its volume_per_partitions, due to skew in homopolymer chains
-		lmer_counts[i] = lmer_counts[i]*kmer_nbits/1024/1024/8; // converting counts to MB
+		lmer_counts[i] = lmer_counts[i]*kmer_nbits/(1.0*1024*1024*8); // converting counts to MB
 //		lmer_counts[i]= ceil(lmer_counts[i]*kmer_nbits/(0.75*volume_per_partition)/1024/1024); 
 //		lmer_counts[i] = ceil(log(lmer_counts[i])/log(4));
 //		lmer_counts[i]= pow(4,lmer_counts[i]);

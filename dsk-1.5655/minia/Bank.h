@@ -85,7 +85,7 @@ class Bank{
         int estimate_max_readlen();
 
 	uint64_t reestimate_partitions(int l); // reestimate partitions sizes to ensure uniform partition sizes
-	void count_kmers_for_small_value(int l,long *lmer_counts); // reestimate partitions sizes to ensure uniform partition sizes
+	void count_kmers_for_small_value(int l,double *lmer_counts); // reestimate partitions sizes to ensure uniform partition sizes
  
         buffered_file_t  **buffered_file;
 };

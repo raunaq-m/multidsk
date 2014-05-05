@@ -28,6 +28,7 @@ protected:
     {
         key_type key;
         uint32_t value; 
+	int length;
     };
 
     uint64_t hash_size;
@@ -59,14 +60,12 @@ public:
     OAHash(uint64_t max_elements);
     ~OAHash();
     element_pair * find_slot(key_type key);
-    void insert(key_type graine, int value);
-//#ifndef _multik
-    void increment(key_type graine);
-/*#else
-    void increment(key_type graine,key_type graine_length);
-    void increment(key_type graine,key_type length, int value);
-#endif*/
-    bool get( key_type graine, int * val);
+    void insert(key_type graine, int value,int length);
+    void increment(key_type graine,int length);
+    void increment_by_value(key_type graine,int value, int length);
+    void delete_key(key_type graine); 
+
+    bool get( key_type graine, int * val, int * length);
     bool has_key(key_type graine);
     void printstat();
     uint64_t memory_usage();

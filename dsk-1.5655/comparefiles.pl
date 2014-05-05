@@ -4,7 +4,8 @@ while($l=<file>)
 {
 	chomp($l);
 	($kmer,$c)=split(/ /,$l);
-	$hash{substr($kmer,-8)} ++;
+	#$hash{substr($kmer,-8)} ++;
+	$hash{$kmer} = $c;
 }
 close file;
 
@@ -15,7 +16,8 @@ while($l=<file>)
 	($kmer,$c)=split(/ /,$l);
 #	if($hash{$kmer}==$c) { print "$kmer $hash{$kmer} $c\n";}
 #	if(!exists($hash{$kmer})) { print "$k\n"; }
-	$hashm{substr($kmer,-8)}++;
+	#$hashm{substr($kmer,-8)}++;
+	$hashm{$kmer} =$c;
 }
 for $k (keys %hash)
 {

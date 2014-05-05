@@ -2,6 +2,7 @@
 int totalKmers;
 int smallestKmer ;
 int *Kmerlist;
+unordered_map<int,int> kmerlength_map;
 int* loadKmers(char *kmerfname) {
 
 	//Load the file containing list of k-mers (assuming kmers entered in decreasing order) 
@@ -27,6 +28,16 @@ int* loadKmers(char *kmerfname) {
 	int largestKmer = Kmerlist[0];
 	smallestKmer = Kmerlist[totalKmers-1];
 	fprintf(stderr,"Largest %d, Smallest %d\n",Kmerlist[0],Kmerlist[totalKmers-1]);
+	// Map numbers from Kmerlist[totalKmers-1] to Kmerlist[0] to the 
+	int iter = 0;
+	for( counter=Kmerlist[0];counter>=Kmerlist[totalKmers-1];counter--)
+	{
+		if (counter < Kmerlist[iter]) 
+			iter++; 
+		printf("Mapped %d to %d int \n",counter, Kmerlist[iter]);
+		pair<int,int> temp_pair(counter,Kmerlist[iter]);
+		kmerlength_map.insert(temp_pair);
+	}
 	/*for (counter=0;counter<count-1;counter++) {
 		fprintf(stderr,"%d kmer value\n",Kmerlist[counter]);
 	}*/
@@ -34,7 +45,7 @@ int* loadKmers(char *kmerfname) {
 	return Kmerlist;
 }
 
-int reestimate_partitions(int size_of_lmers,uint64_t partition_volume,long * lkmer_counts, long * hash_vals, int * partition_files)
+int reestimate_partitions(int size_of_lmers,uint64_t partition_volume,double * lkmer_counts, long * hash_vals, int * partition_files)
 {
 	//Sort the counts using merge sort, and also maintain the positions of sorted numbers
 	vector<clmer> sorted_lmers;
@@ -44,11 +55,12 @@ int reestimate_partitions(int size_of_lmers,uint64_t partition_volume,long * lkm
 		sorted_lmers.push_back(make_pair(i,lkmer_counts[i]));
 	// sort the counts of kmers and maintain their index 
 	sort(sorted_lmers.begin(),sorted_lmers.end(),comparator);
-	uint64_t current_vol=0; int part = 0, iter=0, items_in_cur = 0;
+	double current_vol=0; int part = 0, iter=0, items_in_cur = 0;
 	for(vector<clmer>::iterator it=sorted_lmers.begin(); it!=sorted_lmers.end();++it)
 	{
 		clmer temp = *it;
-		if(current_vol>=partition_volume/2 || items_in_cur > 5000 )
+		//if(current_vol>=partition_volume/2 || items_in_cur > 5000 )
+		if(current_vol>=partition_volume )
 		{
 			current_vol = 0;
 			items_in_cur = 1;
@@ -63,7 +75,7 @@ int reestimate_partitions(int size_of_lmers,uint64_t partition_volume,long * lkm
 			hash_vals[iter] = temp.first;
 			partition_files[iter]=part;
 		}
-		//printf("kmer count %lu,current vol %lu, kmer %lu, partition file %d\n",temp.second,current_vol,hash_vals[iter],partition_files[iter]);
+		//printf("iterr %d kmer count %f,current vol %f, kmer %lu, partition file %d\n",iter, temp.second,current_vol,hash_vals[iter],partition_files[iter]);
 		iter++;
 	}
 	// print out lmers their counts and the partition files 

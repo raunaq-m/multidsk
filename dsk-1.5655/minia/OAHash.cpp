@@ -100,7 +100,8 @@ inline uint64_t OAHash::hashcode( uint64_t elem )
 
 bool OAHash::is_occupied(element_pair *element)
 {
-    return (element->value != 0);
+    //return !(element->value == 0 || element->value == -1);
+    return (!element->value == 0);
 }
 
 OAHash::element_pair * OAHash::find_slot(key_type key)
@@ -126,57 +127,61 @@ OAHash::element_pair * OAHash::find_slot(key_type key)
 }
 
 //if graine already here, overwrite old value
-void OAHash::insert(key_type graine, int value)
+void OAHash::insert(key_type graine, int value, int length)
 {
     element_pair *element = find_slot(graine);
     if (!is_occupied(element))
+    {
         element->key = graine;
+	element->length = length;
+    }
     element->value = value;
 }
 
 // increment the value of a graine
-//#ifndef _multik
-void OAHash::increment(key_type graine)
+void OAHash::increment(key_type graine, int length)
 {
     element_pair *element = find_slot(graine);
     if (!is_occupied(element))
+    {
         element->key = graine;
+	element->length = length;
+    }
     element->value = element->value + 1;
 }
-/*#else
-void OAHash::increment(key_type graine, key_type graine_length)
+
+void OAHash::increment_by_value(key_type graine, int value, int length)
 {
     element_pair *element = find_slot(graine);
     if (!is_occupied(element))
+    {
         element->key = graine;
-   element->length = graine_length; 
-   element->value = element->value + 1;
-
+	element->length = length;
+    }
+    element->value = element->value + value;
 }
-void OAHash::increment(key_type graine, key_type length, int amount)
+void OAHash::delete_key(key_type graine)
 {
 	element_pair *element = find_slot(graine);
-	if(!is_occupied(element))
-		element->key = graine;
-	element->length = length;
-	element->value = element->value + amount;
+	element->value = 0;
 }
-#endif
-*/
-bool OAHash::get( key_type graine, int * val)
+bool OAHash::get( key_type graine, int * val, int * length)
 { 
     element_pair *element = find_slot(graine);
     if (!is_occupied(element))
         return false;
     if (element->key == graine)
         if (val != NULL)
-            *val = element->value;
+        {
+	    *val = element->value;
+	    *length = element->length;
+	}
     return true;
 }
 
 bool OAHash::has_key(key_type graine)
 {
-    return get(graine,NULL) == 1;
+    return get(graine,NULL,NULL) == 1;
 }
 
 
@@ -194,7 +199,8 @@ bool OAHash::next_iterator()
         iterator++;
         if (iterator == data+hash_size)
             return false;
-        if (iterator->value != 0)
+        //if ( !(iterator->value == 0 ||iterator->value == -1))
+	if ( !(iterator->value == 0))
             break;
     }
     return true;

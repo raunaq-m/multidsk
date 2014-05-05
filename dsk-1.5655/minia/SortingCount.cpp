@@ -15,6 +15,7 @@ bool use_hashing = true; // use hashing instead of sorting (better control of me
 float load_factor = 0.7;
 bool use_compressed_reads = true ; // true; // write compressed read file
 extern int *Kmerlist;
+extern unordered_map<int,int> kmerlength_map; 
 bool output_histo;
 
 
@@ -70,7 +71,7 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
     
 #if OMP
     use_compressed_reads =true;
-    nb_threads = 4;
+    nb_threads = 8;
     max_memory /= nb_threads;
     max_memory = max (max_memory,1);
     //max_memory *= nb_threads; // no parallelization in hash counting part
@@ -121,7 +122,7 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
     int size_for_reestimation = ceil((passes_hash + partitions_hash)*1.8);
     printf("volume per partition is %llu Passes hash Partitions hash %d %d \n",volume_per_partition,passes_hash,partitions_hash);
    // reestimating number of partitions and passes based on l-mer counts 
-    long * lmer_counts = (long * ) malloc(sizeof(long)*pow(4,size_for_reestimation));
+    double * lmer_counts = (double * ) malloc(sizeof(long)*pow(4,size_for_reestimation));
     long * lmers_for_hash = (long * ) malloc(sizeof(long)*pow(4,size_for_reestimation));
     int * partitions_for_lmers =(int * ) malloc(sizeof(int)*pow(4,size_for_reestimation));
     Sequences->count_kmers_for_small_value(size_for_reestimation,lmer_counts);
@@ -649,7 +650,8 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
         // TODO to guillaume: remove that todo above, because it is done, right?
         kmer_type lkmer,lkmer_length,lkmer_temp,exp;
 	long it_zero=0;
-	OAHash * hash[totalKmers];
+	//OAHash * hash[totalKmers];
+	OAHash * hash;
 #if OMP 
         //omp_set_numthreads(2);  //num_threads(2) //if(!output_histo) num_threads(nb_threads)
 #pragma omp parallel for private (p,s,lkmer,lkmer_length,hash,lkmer_temp,exp)  num_threads(nb_threads)
@@ -681,38 +683,33 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
            	if (use_hashing_for_this_partition)
             	{
                 	// hash partition and save to solid file
-	                ///OAHash * hash[totalKmers];
 			
-			for(s=0;s<totalKmers;s++) 
-				hash[s] = new OAHash(max_memory*1024LL*1024LL/totalKmers); // There will be totalKmers hashes being operated at the same time to store into the totalKmers file
+			//for(s=0;s<totalKmers;s++) 
+			//	hash[s] = new OAHash(max_memory*1024LL*1024LL/totalKmers); // There will be totalKmers hashes being operated at the same time to store into the totalKmers file
+			hash = new OAHash(max_memory*1024LL*1024LL/2); // One hash to store all types of k-mer lengths
+
         	        uint64_t nkmers_read=0;
                 	redundant_partitions_file[p]->read_element_buffered(&lkmer_length);
 
 	                while (redundant_partitions_file[p]->read_element_buffered(&lkmer))
         	        {
-				//kmer_type exp;
-				for (s=0;s<totalKmers;s++)
+			
+				if(lkmer_length == Kmerlist[0])  //only add the largest k-mer 
+					hash->increment(lkmer,lkmer_length);
+				else
 				{
-					//kmer_type lkmer_temp;
-					if(lkmer_length<Kmerlist[s])
-						continue;
-					if(s==0)
-					{
-						hash[s]->increment(lkmer);  //add largest kmer to the file directly
-					}
-					else
-					{
-						exp = (((kmer_type)1)<<(Kmerlist[s]*2))-1;
-						lkmer_temp = lkmer & exp;
-						hash[s]->increment(lkmer_temp);
-					}
-				}
+			    		unordered_map<int,int>::const_iterator got = kmerlength_map.find(lkmer_length);
+					exp = (((kmer_type)1)<<(got->second*2))-1;
+					lkmer_temp = lkmer & exp;
+					hash->increment(lkmer_temp,got->second);
+
+				}	
 				if(!redundant_partitions_file[p]->read_element_buffered(&lkmer_length)) 
 				{
 					break;
 				}
 				nkmers_read++;
-   	  	    		long pass_lkmer = code2first_n_nucleotide(lkmer,size_for_reestimation);
+   	  	    		//long pass_lkmer = code2first_n_nucleotide(lkmer,size_for_reestimation);
 				/*if(pass_lkmer==19174)
 				{
 		    			zero = code2seq(lkmer,temp_kmer);
@@ -736,14 +733,14 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
                 
                 
                		if (verbose >= 2)
-               		     printf("Pass %d/%d partition %d/%d hash load factor: %0.3f\n",current_pass+1,nb_passes,p+1,nb_partitions,hash[0]->load_factor());
+               		     printf("Pass %d/%d partition %d/%d hash load factor: %0.3f\n",current_pass+1,nb_passes,p+1,nb_partitions,hash->load_factor());
                 	for( s=0;s<totalKmers;s++) 
 			{
              	   		//printf("Writing kmers for k = %d \n",Kmerlist[s]);
-				hash[s]->start_iterator();
-				while (hash[s]->next_iterator())
+				hash->start_iterator();
+				while (hash->next_iterator())
                 		{
-					uint_abundance_t abundance = hash[s]->iterator->value;
+					uint_abundance_t abundance = hash->iterator->value;
         	       		 	uint_abundance_t abund_tid = (current_pass+1)*100+p;
 					if(output_histo)
         	           	        {
@@ -757,9 +754,10 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
 	                        	 histo_count[saturated_abundance]++;
 #endif
                     	    	      	}
-	                    	    	if (abundance >= nks && abundance <= max_couv)
+					int length_kmer = hash->iterator->length;
+	                    	    	if (abundance >= nks && abundance <= max_couv && length_kmer == Kmerlist[s])
        		            	    	{
-		                        	SolidKmers[s]->write_element_buffered(&(hash[s]->iterator->key),tid);
+		                        	SolidKmers[s]->write_element_buffered(&(hash->iterator->key),tid);
                         		
 	        	               		 NbSolid_omp[tid]++;
 	                	        	if (write_count)
@@ -767,10 +765,33 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
 		                            		//SolidKmers[s]->write_buffered(&abund_tid, sizeof(abund_tid),tid, false);
 	                    	    	}
 		                    distinct_kmers_per_partition[p]++;
-				}	
+				}
+			// INSERT HERE CODE TO CHANGE KEYS OF LENGTH GREATER THAN Kmerlist[s+1]	to a smaller size
+				if(s!=totalKmers-1) 
+				{
+					OAHash * temp_ = new OAHash(max_memory*1024LL*1024LL/2);
+					hash->start_iterator();
+					while(hash->next_iterator())
+					{
+						int length_ = hash->iterator->length;
+						int abundance = hash->iterator->value;
+						lkmer = hash->iterator->key;
+						if (length_ == Kmerlist[s]) 
+						{
+							exp = (((kmer_type)1)<<(Kmerlist[s+1]*2))-1;
+							lkmer_temp = lkmer & exp;
+							temp_->increment_by_value(lkmer_temp,abundance,Kmerlist[s+1]);
+						}
+						else 
+						{
+							temp_->increment_by_value(lkmer,abundance,length_);
+						}
+					}
+					hash->~OAHash();
+					hash = temp_;
+				}
 			}
-            		for(s=0;s<totalKmers;s++)
-				hash[s]->~OAHash();
+				hash->~OAHash();
 			//printf("All hashes closed and destroyed \n");
 		}
             
