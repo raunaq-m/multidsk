@@ -16,7 +16,7 @@ int* loadKmers(char *kmerfname) {
 		getline(infile,line);
 		count++;
 	}
-	fprintf(stderr,"No of kmers asked for computation  %d\n",count-1);
+	//fprintf(stderr,"No of kmers asked for computation  %d\n",count-1);
 	infile.close();
 	totalKmers = count-1;
  	Kmerlist = new int [count]; 
@@ -27,14 +27,14 @@ int* loadKmers(char *kmerfname) {
 	}
 	int largestKmer = Kmerlist[0];
 	smallestKmer = Kmerlist[totalKmers-1];
-	fprintf(stderr,"Largest %d, Smallest %d\n",Kmerlist[0],Kmerlist[totalKmers-1]);
+	//fprintf(stderr,"Largest %d, Smallest %d\n",Kmerlist[0],Kmerlist[totalKmers-1]);
 	// Map numbers from Kmerlist[totalKmers-1] to Kmerlist[0] to the 
 	int iter = 0;
 	for( counter=Kmerlist[0];counter>=Kmerlist[totalKmers-1];counter--)
 	{
 		if (counter < Kmerlist[iter]) 
 			iter++; 
-		printf("Mapped %d to %d int \n",counter, Kmerlist[iter]);
+		//printf("Mapped %d to %d int \n",counter, Kmerlist[iter]);
 		pair<int,int> temp_pair(counter,Kmerlist[iter]);
 		kmerlength_map.insert(temp_pair);
 	}
@@ -60,21 +60,37 @@ int reestimate_partitions(int size_of_lmers,uint64_t partition_volume,double * l
 	{
 		clmer temp = *it;
 		//if(current_vol>=partition_volume/2 || items_in_cur > 5000 )
-		if(current_vol>=partition_volume )
-		{
-			current_vol = 0;
-			items_in_cur = 1;
-			part++;
-			hash_vals[iter] = temp.first;
-			partition_files[iter]=part;
-		}
-		else
-		{
-			current_vol +=temp.second;
+		// if(current_vol>=partition_volume )
+		// {
+			// current_vol = 0;
+			// items_in_cur = 1;
+			// part++;
+			// hash_vals[iter] = temp.first;
+			// partition_files[iter]=part;
+		// }
+		// else
+		// {
+		current_vol +=temp.second;
+		if(current_vol <= partition_volume)
+		{	
 			items_in_cur++;
 			hash_vals[iter] = temp.first;
 			partition_files[iter]=part;
+		}else
+		{
+			if(items_in_cur == 0) 
+			{
+				current_vol = 0;
+			}else
+			{
+				current_vol = temp.second;
+				part++;
+			}
+			items_in_cur = 1;
+			hash_vals[iter] = temp.first;
+			partition_files[iter] = part;
 		}
+		//}
 		//printf("iterr %d kmer count %f,current vol %f, kmer %lu, partition file %d\n",iter, temp.second,current_vol,hash_vals[iter],partition_files[iter]);
 		iter++;
 	}

@@ -91,7 +91,7 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
     {
         volume_per_pass = volume / nb_passes;
         nb_partitions = ( volume_per_pass * totalKmers / max_memory ) + 1; 
-	printf("volume per pass and total volume %llu %llu \n",volume_per_pass,(unsigned long long)volume);
+	//printf("volume per pass and total volume %llu %llu \n",volume_per_pass,(unsigned long long)volume);
         // if partitions are hashed instead of sorted, adjust for load factor
         // (as in the worst case, all kmers in the partition are distinct and partition may be slightly bigger due to hash-repartition)
         if (use_hashing)
@@ -120,7 +120,7 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
     passes_hash = ceil(log(nb_passes)/log(4));
     partitions_hash = ceil(log(nb_partitions)/log(4));
     int size_for_reestimation = ceil((passes_hash + partitions_hash)*1.8);
-    printf("volume per partition is %llu Passes hash Partitions hash %d %d \n",volume_per_partition,passes_hash,partitions_hash);
+    //printf("volume per partition is %llu Passes hash Partitions hash %d %d \n",volume_per_partition,passes_hash,partitions_hash);
    // reestimating number of partitions and passes based on l-mer counts 
     double * lmer_counts = (double * ) malloc(sizeof(long)*pow(4,size_for_reestimation));
     long * lmers_for_hash = (long * ) malloc(sizeof(long)*pow(4,size_for_reestimation));
@@ -135,12 +135,11 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
         part_hash.insert (temp_pair); // Add element to the hash 
     }
     //uint64_t up_passes_size = volume_per_pass;
-    printf("no of partitions before %lu and after  %d %lu \n ",nb_partitions*nb_passes,temp_partition,nb_passes);
       	do
 	{
 		//recompute the number of partitions based on updated partitions estimate
 		nb_partitions = ceil(temp_partition*1.0/nb_passes);
-		printf("new no of partitions is %lu \n",nb_partitions);
+		//printf("new no of partitions is %lu \n",nb_partitions);
 //		if( use_hashing) 
 //		//		{
 //          	   nb_partitions = (uint32_t) ceil((float) nb_partitions / load_factor);
@@ -157,6 +156,7 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
 	        else
         	    break;
 	}while(1);
+    	printf("no of partitions before %lu and after %d passes %lu \n",nb_partitions*nb_passes,temp_partition,nb_passes);
 	// compute the partition depths and kmer to match in each partition file 
 	/*int *partition_kmer_depth = (int * ) malloc(sizeof(int)*temp_partition);
 	for (int j =0; j<temp_partition;j++)
@@ -248,12 +248,12 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
     BinaryBankConcurrent * SolidKmers[totalKmers];
     for (int s=0;s<totalKmers;s++) 
     {	
-	char temp[1024];
-	sprintf(temp,"%s.%d",return_file_name(solid_kmers_file),Kmerlist[s]);
-   	uint64_t exp = (((uint64_t)1)<<(Kmerlist[s]*2))-1;
-	SolidKmers[s] = new BinaryBankConcurrent(temp,sizeof(kmer),true,nb_threads);
-//	printf("kmer is %d exp is %llu \n",Kmerlist[s],exp);
-	//BinaryBankConcurrent * SolidKmers = new BinaryBankConcurrent(return_file_name(solid_kmers_file),sizeof(kmer),true,nb_threads);
+		char temp[1024];
+		sprintf(temp,"%s.%d",return_file_name(solid_kmers_file),Kmerlist[s]);
+		uint64_t exp = (((uint64_t)1)<<(Kmerlist[s]*2))-1;
+		SolidKmers[s] = new BinaryBankConcurrent(temp,sizeof(kmer),true,nb_threads);
+		//printf("kmer is %d exp is %llu \n",Kmerlist[s],exp);
+		//BinaryBankConcurrent * SolidKmers = new BinaryBankConcurrent(return_file_name(solid_kmers_file),sizeof(kmer),true,nb_threads);
 
 	    if (write_count)
 	    {
@@ -629,7 +629,7 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
 
             for (uint32_t p=0;p<nb_partitions;p++)
             {
-		redundant_partitions_file[p]->close();
+				redundant_partitions_file[p]->close();
                 redundant_partitions_file[p]->open(false);
             }
 
@@ -652,254 +652,258 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
 	long it_zero=0;
 	//OAHash * hash[totalKmers];
 	OAHash * hash;
+	int p,s;
 #if OMP 
         //omp_set_numthreads(2);  //num_threads(2) //if(!output_histo) num_threads(nb_threads)
 #pragma omp parallel for private (p,s,lkmer,lkmer_length,hash,lkmer_temp,exp)  num_threads(nb_threads)
 #endif        
         // load, sort each partition to output solid kmers
-        for (int p=0;p<nb_partitions;p++)
+        for ( p=0;p<nb_partitions;p++)
         {
-		//printf("Starting counting partition %d \n",p);
-		//kmer_type lkmer;
-		//kmer_type lkmer_length;
-		char temp_kmer[256];  // bug check code 
-		int zero;
-            
+			//printf("Starting counting partition %d \n",p);
+			//kmer_type lkmer;
+			//kmer_type lkmer_length;
+			char temp_kmer[256];  // bug check code 
+			int zero;
+				
            	bool use_hashing_for_this_partition = use_hashing;
-            	if(hybrid_mode)
-            	{
-              		//  printf("max mem %i MB  ,   parti size %i MB\n",max_memory,(redundant_partitions_file[p]->nb_elements()*sizeof(kmer_type))/1024LL/1024LL);
-                	if(   (redundant_partitions_file[p]->nb_elements()*sizeof(kmer_type)/totalKmers) <  (max_memory*1024LL*1024LL) )  // Maintain totalKmers hash for each partition file
-                    		use_hashing_for_this_partition = false;
-                	else
-                    		use_hashing_for_this_partition = true;
-            	}
-            	int tid =0;
-		int s;
-#if OMP
-            	tid = omp_get_thread_num();
-#endif
-            	//use_hashing_for_this_partition = false;  //to check the vector part of the code
-           	if (use_hashing_for_this_partition)
-            	{
-                	// hash partition and save to solid file
-			
-			//for(s=0;s<totalKmers;s++) 
-			//	hash[s] = new OAHash(max_memory*1024LL*1024LL/totalKmers); // There will be totalKmers hashes being operated at the same time to store into the totalKmers file
-			hash = new OAHash(max_memory*1024LL*1024LL/2); // One hash to store all types of k-mer lengths
-
-        	        uint64_t nkmers_read=0;
-                	redundant_partitions_file[p]->read_element_buffered(&lkmer_length);
-
-	                while (redundant_partitions_file[p]->read_element_buffered(&lkmer))
-        	        {
-			
-				if(lkmer_length == Kmerlist[0])  //only add the largest k-mer 
-					hash->increment(lkmer,lkmer_length);
+			if(hybrid_mode)
+			{
+				//  printf("max mem %i MB  ,   parti size %i MB\n",max_memory,(redundant_partitions_file[p]->nb_elements()*sizeof(kmer_type))/1024LL/1024LL);
+				if(   (redundant_partitions_file[p]->nb_elements()*sizeof(kmer_type)) <  (max_memory*1024LL*1024LL) )  // Maintain totalKmers hash for each partition file
+				{	
+					use_hashing_for_this_partition = false;
+				}
 				else
 				{
-			    		unordered_map<int,int>::const_iterator got = kmerlength_map.find(lkmer_length);
-					exp = (((kmer_type)1)<<(got->second*2))-1;
-					lkmer_temp = lkmer & exp;
-					hash->increment(lkmer_temp,got->second);
-
-				}	
-				if(!redundant_partitions_file[p]->read_element_buffered(&lkmer_length)) 
-				{
-					break;
+					use_hashing_for_this_partition = true;
 				}
-				nkmers_read++;
-   	  	    		//long pass_lkmer = code2first_n_nucleotide(lkmer,size_for_reestimation);
-				/*if(pass_lkmer==19174)
-				{
-		    			zero = code2seq(lkmer,temp_kmer);
-				    	printf("read %s %lu\n",temp_kmer,pass_lkmer);
-				    	it_zero++;
-				}*/
-#if SINGLE_BAR
-        	            if(verbose==0 && nkmers_read==10000)
-                	    {
-                        	if (nb_threads == 1)
-	                            progress.inc(nkmers_read*sizeof(kmer_type));
-        	                else
-                	            progress.inc(nkmers_read*sizeof(kmer_type),tid);
-                	        nkmers_read=0;
-                    	    }
+			}
+            int tid =0;
+			//int s;
+			//Computing if hashing should be used or not for this partition
+#if OMP
+            tid = omp_get_thread_num();
 #endif
-                	}
+            //use_hashing_for_this_partition = false;  //to check the vector part of the code
+           	if (use_hashing_for_this_partition)
+            {
+                // hash partition and save to solid file
+				
+				//for(s=0;s<totalKmers;s++) 
+				//	hash[s] = new OAHash(max_memory*1024LL*1024LL/totalKmers); // There will be totalKmers hashes being operated at the same time to store into the totalKmers file
+				hash = new OAHash(max_memory*1024LL*1024LL/2); // One hash to store all types of k-mer lengths
+
+				uint64_t nkmers_read=0;
+				redundant_partitions_file[p]->read_element_buffered(&lkmer_length);
+
+				while (redundant_partitions_file[p]->read_element_buffered(&lkmer))
+				{
+			
+					if(lkmer_length == Kmerlist[0])  //only add the largest k-mer 
+						hash->increment(lkmer,lkmer_length);
+					else
+					{
+						unordered_map<int,int>::const_iterator got = kmerlength_map.find(lkmer_length);
+						exp = (((kmer_type)1)<<(got->second*2))-1;
+						lkmer_temp = lkmer & exp;
+						hash->increment(lkmer_temp,got->second);
+
+					}	
+					if(!redundant_partitions_file[p]->read_element_buffered(&lkmer_length)) 
+					{
+						break;
+					}
+					nkmers_read++;
+						//long pass_lkmer = code2first_n_nucleotide(lkmer,size_for_reestimation);
+					/*if(pass_lkmer==19174)
+					{
+							zero = code2seq(lkmer,temp_kmer);
+							printf("read %s %lu\n",temp_kmer,pass_lkmer);
+							it_zero++;
+					}*/
+#if SINGLE_BAR
+					if(verbose==0 && nkmers_read==10000)
+					{
+						if (nb_threads == 1)
+							progress.inc(nkmers_read*sizeof(kmer_type));
+						else
+							progress.inc(nkmers_read*sizeof(kmer_type),tid);
+						nkmers_read=0;
+					}
+#endif
+                }
 			//printf("Value of it_zero is %lu \n",it_zero);
                 
                 //single bar
                 
                 
-               		if (verbose >= 2)
-               		     printf("Pass %d/%d partition %d/%d hash load factor: %0.3f\n",current_pass+1,nb_passes,p+1,nb_partitions,hash->load_factor());
+				if (verbose >= 2)
+					 printf("Pass %d/%d partition %d/%d hash load factor: %0.3f\n",current_pass+1,nb_passes,p+1,nb_partitions,hash->load_factor());
                 	for( s=0;s<totalKmers;s++) 
-			{
-             	   		//printf("Writing kmers for k = %d \n",Kmerlist[s]);
-				hash->start_iterator();
-				while (hash->next_iterator())
-                		{
-					uint_abundance_t abundance = hash->iterator->value;
-        	       		 	uint_abundance_t abund_tid = (current_pass+1)*100+p;
-					if(output_histo)
-        	           	        {
-                	       		 uint_abundance_t saturated_abundance;
-                        		 saturated_abundance = (abundance >= 10000) ? 10000 : abundance;
-#if OMP
-  	                      		 histo_count_omp[tid][saturated_abundance]++;
-#else
-        	             		 //printf("histo_count 0 1  2 %i %i %i \n",histo_count[0],histo_count[1],histo_count[2]);
-                        
-	                        	 histo_count[saturated_abundance]++;
-#endif
-                    	    	      	}
-					int length_kmer = hash->iterator->length;
-	                    	    	if (abundance >= nks && abundance <= max_couv && length_kmer == Kmerlist[s])
-       		            	    	{
-		                        	SolidKmers[s]->write_element_buffered(&(hash->iterator->key),tid);
-                        		
-	        	               		 NbSolid_omp[tid]++;
-	                	        	if (write_count)
-		                            		SolidKmers[s]->write_buffered(&abundance, sizeof(abundance),tid, false);
-		                            		//SolidKmers[s]->write_buffered(&abund_tid, sizeof(abund_tid),tid, false);
-	                    	    	}
-		                    distinct_kmers_per_partition[p]++;
-				}
-			// INSERT HERE CODE TO CHANGE KEYS OF LENGTH GREATER THAN Kmerlist[s+1]	to a smaller size
-				if(s!=totalKmers-1) 
-				{
-					OAHash * temp_ = new OAHash(max_memory*1024LL*1024LL/2);
-					hash->start_iterator();
-					while(hash->next_iterator())
 					{
-						int length_ = hash->iterator->length;
-						int abundance = hash->iterator->value;
-						lkmer = hash->iterator->key;
-						if (length_ == Kmerlist[s]) 
-						{
-							exp = (((kmer_type)1)<<(Kmerlist[s+1]*2))-1;
-							lkmer_temp = lkmer & exp;
-							temp_->increment_by_value(lkmer_temp,abundance,Kmerlist[s+1]);
+             	   		//printf("Writing kmers for k = %d \n",Kmerlist[s]);
+						hash->start_iterator();
+						while (hash->next_iterator())
+                		{
+							uint_abundance_t abundance = hash->iterator->value;
+        	       		 	uint_abundance_t abund_tid = (current_pass+1)*100+p;
+							if(output_histo)
+							{
+							 uint_abundance_t saturated_abundance;
+							 saturated_abundance = (abundance >= 10000) ? 10000 : abundance;
+#if OMP
+							 histo_count_omp[tid][saturated_abundance]++;
+#else
+							 //printf("histo_count 0 1  2 %i %i %i \n",histo_count[0],histo_count[1],histo_count[2]);
+					
+							 histo_count[saturated_abundance]++;
+#endif
+							}
+							int length_kmer = hash->iterator->length;
+	                    	if (abundance >= nks && abundance <= max_couv && length_kmer == Kmerlist[s])
+							{
+								SolidKmers[s]->write_element_buffered(&(hash->iterator->key),tid);
+							
+								 NbSolid_omp[tid]++;
+								if (write_count)
+										SolidKmers[s]->write_buffered(&abundance, sizeof(abundance),tid, false);
+										//SolidKmers[s]->write_buffered(&abund_tid, sizeof(abund_tid),tid, false);
+							}
+		                    distinct_kmers_per_partition[p]++;
 						}
-						else 
+			// CODE TO CHANGE KEYS OF LENGTH GREATER THAN Kmerlist[s+1]	to a smaller size
+						if(s!=totalKmers-1) 
 						{
-							temp_->increment_by_value(lkmer,abundance,length_);
+							OAHash * temp_ = new OAHash(max_memory*1024LL*1024LL/2);
+							hash->start_iterator();
+							while(hash->next_iterator())
+							{
+								int length_ = hash->iterator->length;
+								int abundance = hash->iterator->value;
+								lkmer = hash->iterator->key;
+								if (length_ == Kmerlist[s]) 
+								{
+									exp = (((kmer_type)1)<<(Kmerlist[s+1]*2))-1;
+									lkmer_temp = lkmer & exp;
+									temp_->increment_by_value(lkmer_temp,abundance,Kmerlist[s+1]);
+								}
+								else 
+								{
+									temp_->increment_by_value(lkmer,abundance,length_);
+								}
+							}
+							hash->~OAHash();
+							hash = temp_;
 						}
 					}
-					hash->~OAHash();
-					hash = temp_;
-				}
-			}
 				hash->~OAHash();
 			//printf("All hashes closed and destroyed \n");
-		}
+			}
             
-            	else
-            	{
-	                // sort partition and save to solid file
-        	        //vector < kmer_type > kmers;
-			vector < kmer_type > kmers[totalKmers];
-                	uint64_t nkmers_read=0;
-               		//int s=0; 
-                	
-                	redundant_partitions_file[p]->read_element_buffered(&lkmer_length);
-                	while (redundant_partitions_file[p]->read_element_buffered (&lkmer))
-                	{
-    		                for(s=0;s<totalKmers;s++)
+			else
+			{
+				// sort partition and save to solid file
+        	    //vector < kmer_type > kmers;
+				vector < kmer_type > kmers[totalKmers];
+                uint64_t nkmers_read=0;
+               	//int s=0; 
+				
+				redundant_partitions_file[p]->read_element_buffered(&lkmer_length);
+				while (redundant_partitions_file[p]->read_element_buffered (&lkmer))
 				{
-					kmer_type lkmer_temp;
-					kmer_type exp;
-					if(lkmer_length<Kmerlist[s])
-						continue;
-					if(s==0)
-						kmers[s].push_back (lkmer);
-					else
+    		        for(s=0;s<totalKmers;s++)
 					{
-						//zero = code2seq(lkmer,temp_kmer,Kmerlist[s],kmerMask);
-						//lkmer_temp = codeSeed(temp_kmer,Kmerlist[s],kmerMask);
-						exp = (((kmer_type)1)<<(Kmerlist[s]*2))-1;
-						lkmer_temp = lkmer & exp; // Converting the kmer to its smaller equivalent in binary 
-						kmers[s].push_back (lkmer_temp);
-					}
-                    		}
-				nkmers_read++;
-				if(!redundant_partitions_file[p]->read_element_buffered(&lkmer_length)) break;  //Added to get the next length of kmer
+						//kmer_type lkmer_temp;
+						//kmer_type exp;
+						if(lkmer_length<Kmerlist[s])
+							continue;
+						if(s==0)
+							kmers[s].push_back (lkmer);
+						else
+						{
+							exp = (((kmer_type)1)<<(Kmerlist[s]*2))-1;
+							lkmer_temp = lkmer & exp; // Converting the kmer to its smaller equivalent in binary 
+							kmers[s].push_back (lkmer_temp);
+						}
+                    }
+					nkmers_read++;
+					if(!redundant_partitions_file[p]->read_element_buffered(&lkmer_length)) break;  //Added to get the next length of kmer
 #if SINGLE_BAR
-                    		if(verbose==0 && nkmers_read==10000)
-                    		{
-		                        if (nb_threads == 1)
-		                            progress.inc(nkmers_read*sizeof(kmer_type));
-        		                else
-                        		    progress.inc(nkmers_read*sizeof(kmer_type),tid);
-                        		nkmers_read=0;
-                    		}
+					if(verbose==0 && nkmers_read==10000)
+					{
+						if (nb_threads == 1)
+							progress.inc(nkmers_read*sizeof(kmer_type));
+						else
+							progress.inc(nkmers_read*sizeof(kmer_type),tid);
+						nkmers_read=0;
+					}
 #endif
-                	}
+                }
                 
-                	for(s=0;s<totalKmers;s++)
-               		{
-			 	sort (kmers[s].begin (), kmers[s].end ());
+                for(s=0;s<totalKmers;s++)
+               	{
+					sort (kmers[s].begin (), kmers[s].end ());
                 
-	                	kmer_type previous_kmer = *(kmers[s].begin ());
-        	        	uint_abundance_t abundance = 0;
-	                	for (vector < kmer_type >::iterator it = kmers[s].begin (); it != kmers[s].end ();it++)
-                		{
-	                 	   	kmer_type current_kmer = *it;
-        	            
-                	    	   	if (current_kmer == previous_kmer)
-                        			abundance++;
-                    	    	   	else
-                    	    	   	{
-	                        		if(output_histo)
-                        			{
-	                            			uint_abundance_t saturated_abundance;
-        	                    			saturated_abundance = (abundance >= 10000) ? 10000 : abundance;
+					kmer_type previous_kmer = *(kmers[s].begin ());
+					uint_abundance_t abundance = 0;
+					for (vector < kmer_type >::iterator it = kmers[s].begin (); it != kmers[s].end ();it++)
+					{
+						kmer_type current_kmer = *it;
+					
+						if (current_kmer == previous_kmer)
+							abundance++;
+						else
+						{
+							if(output_histo)
+							{
+									uint_abundance_t saturated_abundance;
+									saturated_abundance = (abundance >= 10000) ? 10000 : abundance;
 #if OMP
-               	            			histo_count_omp[tid][saturated_abundance]++;
+									histo_count_omp[tid][saturated_abundance]++;
 #else
-                       		    			histo_count[saturated_abundance]++;
+									histo_count[saturated_abundance]++;
 #endif
-                            
-                        			}
-                     	   			if (abundance >= nks  && abundance <= max_couv)
-                           			{
-                         		  	     NbSolid_omp[tid]++;
- 		         	             	     SolidKmers[s]->write_element_buffered(&previous_kmer,tid);
-                            	
-	        		                     if (write_count)
-                                			SolidKmers[s]->write_buffered(&abundance, sizeof(abundance),tid, false);
-                           			}		
-                    	   			abundance = 1;
-                   	   			distinct_kmers_per_partition[p]++;
-                    	    		}
-	                                previous_kmer = current_kmer;
-                		}
+					
+							}
+							if (abundance >= nks  && abundance <= max_couv)
+							{
+								 NbSolid_omp[tid]++;
+								 SolidKmers[s]->write_element_buffered(&previous_kmer,tid);
+						
+								 if (write_count)
+									SolidKmers[s]->write_buffered(&abundance, sizeof(abundance),tid, false);
+							}		
+								abundance = 1;
+							distinct_kmers_per_partition[p]++;
+						}
+						previous_kmer = current_kmer;
+					}
                 
                 //last kmer
-	                	distinct_kmers_per_partition[p]++;
-        	        	if(output_histo)
-                		{
-	                    		uint_abundance_t saturated_abundance;
-        	            		saturated_abundance = (abundance >= 10000) ? 10000 : abundance;
+					distinct_kmers_per_partition[p]++;
+					if(output_histo)
+					{
+							uint_abundance_t saturated_abundance;
+							saturated_abundance = (abundance >= 10000) ? 10000 : abundance;
 #if OMP
-                	    		histo_count_omp[tid][saturated_abundance]++;
+							histo_count_omp[tid][saturated_abundance]++;
 #else
-        	            		histo_count[saturated_abundance]++;
+							histo_count[saturated_abundance]++;
 #endif
-                    
-                		}
-	                	if (abundance >= nks && abundance <= max_couv)
-                		{
-	                    		NbSolid_omp[tid]++;
-        	            		SolidKmers[s]->write_element_buffered(&previous_kmer,tid);
-                    
-             	        		if (write_count)
-               			  	       SolidKmers[s]->write_buffered(&abundance, sizeof(abundance),tid, false);
-                    
-                		}	
+				
+					}
+					if (abundance >= nks && abundance <= max_couv)
+					{
+							NbSolid_omp[tid]++;
+							SolidKmers[s]->write_element_buffered(&previous_kmer,tid);
+				
+							if (write_count)
+							   SolidKmers[s]->write_buffered(&abundance, sizeof(abundance),tid, false);
+				
+					}	
+				}
 			}
-                }
             
             
 		//printf("Done writing kmers for all K \n");
@@ -922,11 +926,9 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
 		//	printf("Error in the binary file \n");
 		//}
             	redundant_partitions_file[p]->close();
-		//printf("Done writing kmers for all K check 2 \n");
 		
             	remove(redundant_filename[p]);
-		//printf("Done writing kmers for all K check 3 \n");
-            //} //end for all kmers 
+ 
         } // end for partitions
 
 #if OMP

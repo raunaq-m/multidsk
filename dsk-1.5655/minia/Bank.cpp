@@ -315,7 +315,7 @@ void Bank::init(char **fname, int nb_files_)
 
         filesizes += estimated_filesize;
     }
-        printf("Filesize estimated from reads is %llu\n",filesizes );
+       // printf("Filesize estimated from reads is %llu\n",filesizes );
 
     // open each file for reading
     buffered_file = (buffered_file_t**) malloc(sizeof(buffered_file_t *)*nb_files);

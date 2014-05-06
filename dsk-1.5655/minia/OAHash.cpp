@@ -100,7 +100,7 @@ inline uint64_t OAHash::hashcode( uint64_t elem )
 
 bool OAHash::is_occupied(element_pair *element)
 {
-    return (!element->value == 0);
+    return (element->value != 0);
 }
 
 OAHash::element_pair * OAHash::find_slot(key_type key)
@@ -125,6 +125,27 @@ OAHash::element_pair * OAHash::find_slot(key_type key)
     return element;
 }
 
+OAHash::element_pair * OAHash::find_slot(key_type key, int length)
+{
+    uint64_t ptr = hashcode(key) % hash_size; 
+    element_pair *element = data+ptr;
+    uint64_t retries = 0;
+
+    // search until we either find the key, or find an empty slot.
+    while ( ( is_occupied(element)) && ( element->key != key ||  element->length != length ) && (retries < hash_size))
+    {
+        ptr = (ptr + 1) % hash_size;
+        element = data+ptr;
+        retries++;
+    }
+    if (retries == hash_size)
+    {
+        printf("OAHash: max rehashes reached: %lld (notify a developer)\n",(long long)hash_size);
+        exit(1);
+    }
+
+    return element;
+}
 //if graine already here, overwrite old value
 void OAHash::insert(key_type graine, int value, int length)
 {
@@ -140,7 +161,7 @@ void OAHash::insert(key_type graine, int value, int length)
 // increment the value of a graine
 void OAHash::increment(key_type graine, int length)
 {
-    element_pair *element = find_slot(graine);
+    element_pair *element = find_slot(graine,length);
     if (!is_occupied(element))
     {
         element->key = graine;
@@ -151,7 +172,7 @@ void OAHash::increment(key_type graine, int length)
 
 void OAHash::increment_by_value(key_type graine, int value, int length)
 {
-    element_pair *element = find_slot(graine);
+    element_pair *element = find_slot(graine,length);
     if (!is_occupied(element))
     {
         element->key = graine;

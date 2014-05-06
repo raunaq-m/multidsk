@@ -60,6 +60,7 @@ public:
     OAHash(uint64_t max_elements);
     ~OAHash();
     element_pair * find_slot(key_type key);
+    element_pair * find_slot(key_type key,int length);
     void insert(key_type graine, int value,int length);
     void increment(key_type graine,int length);
     void increment_by_value(key_type graine,int value, int length);

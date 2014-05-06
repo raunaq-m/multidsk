@@ -61,7 +61,7 @@ fprintf(stderr,"Running dsk version %s\n",STR(SVN_REV));
 	int *Kmerlist =  loadKmers(argv[2]);
 	
     // kmer size
-	fprintf(stderr,"Smallest kmer is %d \n",smallestKmer);
+	//fprintf(stderr,"Smallest kmer is %d \n",smallestKmer);
     sizeKmer = Kmerlist[0];
     if (sizeKmer>(int)(sizeof(kmer_type)*4))
     {
