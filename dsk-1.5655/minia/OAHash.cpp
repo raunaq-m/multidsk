@@ -19,6 +19,7 @@ OAHash::OAHash(uint64_t max_memory) // in bytes
         printf("empty OAHash allocated\n");
         exit(1);
     }
+    nb_inserted_keys = 0;
     data = (element_pair *) calloc( hash_size, sizeof(element_pair));  //create hashtable
 }
 
@@ -154,6 +155,7 @@ void OAHash::insert(key_type graine, int value, int length)
     {
         element->key = graine;
 	element->length = length;
+        nb_inserted_keys++;
     }
     element->value = value;
 }
@@ -166,6 +168,7 @@ void OAHash::increment(key_type graine, int length)
     {
         element->key = graine;
 	element->length = length;
+        nb_inserted_keys++;
     }
     element->value = element->value + 1;
 }
@@ -177,14 +180,15 @@ void OAHash::increment_by_value(key_type graine, int value, int length)
     {
         element->key = graine;
 	element->length = length;
+        nb_inserted_keys++;
     }
     element->value = element->value + value;
 }
-void OAHash::delete_key(key_type graine)
+/*void OAHash::delete_key(key_type graine)
 {
 	element_pair *element = find_slot(graine);
 	element->value = 0;
-}
+}*/
 bool OAHash::get( key_type graine, int * val, int * length)
 { 
     element_pair *element = find_slot(graine);
@@ -228,20 +232,7 @@ bool OAHash::next_iterator()
 
 float OAHash::load_factor()
 {
-    uint64_t ptr = 0;
-    uint64_t nbKeys = 0;
-    while (ptr < hash_size)
-    {
-        while ((ptr < hash_size) &&  ((data+ptr)->value == 0)  )
-            ptr++;
-
-        if (ptr == hash_size)
-            break;
-        
-        nbKeys++;
-        ptr++;
-    }
-    return (float)nbKeys/(float)hash_size;
+   return (float)nb_inserted_keys/(float)hash_size;
 }
 
 

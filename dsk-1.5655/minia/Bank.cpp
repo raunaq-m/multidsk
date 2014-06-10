@@ -216,8 +216,9 @@ bool  Bank::get_next_seq_from_file(char **nseq, int *len, int file_id)
 }
 
 // wrapper
-bool Bank::get_next_seq(char **nseq, char **cheader, int *len, int *hlen)
+bool Bank::get_next_seq(char **nseq, char **cheader, int *len, int *hlen, int * id_file)
 {
+    * id_file = index_file;
     bool success = get_next_seq_from_file(nseq,cheader,len,hlen,index_file);
     if (success)
         return true;
@@ -228,15 +229,58 @@ bool Bank::get_next_seq(char **nseq, char **cheader, int *len, int *hlen)
         close_stream(index_file);
 	index_file++;
         open_stream(index_file);
-	return get_next_seq(nseq,cheader, len,hlen);
+	return get_next_seq(nseq,cheader, len,hlen, id_file);
     }
     return false;
 }
 
 // wrapper
+bool Bank::get_next_seq(char **nseq, char **cheader, int *len, int *hlen)
+{
+    bool success = get_next_seq_from_file(nseq,cheader,len,hlen,index_file);
+    if (success)
+        return true;
+    
+    // cycle to next file if possible
+    if ( index_file < nb_files-1 )
+    {
+        close_stream(index_file);
+        index_file++;
+        open_stream(index_file);
+        return get_next_seq(nseq,cheader, len,hlen);
+    }
+    return false;
+}
+
+//wrapper
 bool Bank::get_next_seq(char **nseq, int *len)
 {
   return get_next_seq(nseq,NULL,len,NULL);
+}
+//wrapper
+bool Bank::get_next_seq(char **nseq, int *len, int * id_file)
+{
+    return get_next_seq(nseq,NULL,len,NULL,id_file);
+}
+//function for subset of get_next_seq
+bool Bank::get_next_seq_subset( char **nseq, char **cheader, int *len, int *hlen)
+{
+	// Only read a subset of the nb_files 5 % of the files to estimate the k-mer counts
+	bool success = get_next_seq_from_file(nseq,cheader,len,hlen,index_file);
+	
+	if(success)
+		return true;
+		
+	int limit = nb_files/20;
+	//printf("Limit of files to process %d \n",limit);
+	if(index_file < limit -1)
+	{
+		close_stream(index_file);
+		index_file++;
+		open_stream(index_file);
+		return get_next_seq_subset(nseq,cheader,len,hlen);
+	}
+	return false;
 }
 
 // had to move the Bank(x,x) constructor to an init() to avoid calling a constructor inside the Bank(x) constructor
@@ -298,7 +342,14 @@ void Bank::init(char **fname, int nb_files_)
         gzclose(tempfile);
 
     }
-
+    //initialize the buffers
+    buffered_file = (buffered_file_t**) malloc(sizeof(buffered_file_t *)*nb_files);
+    for (i=0; i<nb_files; i++)
+    {
+        buffered_file[i] = (buffered_file_t *)calloc(1, sizeof(buffered_file_t));
+        buffered_file[i]->buffer = (unsigned char*) malloc(BUFFER_SIZE); 
+        buffered_file[i]->fname = strdup(fname[i]);
+    }
     // estimate total size of files
     for (i=0; i<nb_files; i++)
     {
@@ -313,19 +364,12 @@ void Bank::init(char **fname, int nb_files_)
         else
             estimated_filesize = fsize(fname[i]);
 
+        buffered_file[i]->estimated_filesize = estimated_filesize;
         filesizes += estimated_filesize;
     }
-       // printf("Filesize estimated from reads is %llu\n",filesizes );
+        printf("Filesize estimated from reads is %llu\n",filesizes );
 
     // open each file for reading
-    buffered_file = (buffered_file_t**) malloc(sizeof(buffered_file_t *)*nb_files);
-    for (i=0; i<nb_files; i++)
-    {
-        buffered_file[i] = (buffered_file_t *)calloc(1, sizeof(buffered_file_t)); 
-        buffered_file[i]->buffer = (unsigned char*) malloc(BUFFER_SIZE); 
-        buffered_file[i]->fname = strdup(fname[i]);
-    }
-
     rewind_all(); // initialize the get_next_seq iterator to the first file
 
     // init read and dummy (for readname and quality)
@@ -388,49 +432,103 @@ void Bank::count_kmers_for_small_value(int l, double *lmer_counts)
 	int idx=0;
 	long lmer_mask = (((long)1)<<(l*2)) -1;
 	//initialize all lmer_counts to zero
+	uint64_t total_counts=0;
 	for(int i=0;i<total_bins;i++)
 		lmer_counts[i]=0;
-	while(get_next_seq(&rseq,&readlen))
-	{
-		//count l-mers from the read and store them in lmer_counts
-		pt_begin = rseq;	
-		while(pt_begin < (rseq + readlen))
+		uint64_t multiplication_factor ;
+	if(filesizes > 21474836480 || nb_files>20)
+	{	
+		printf("Limit of files to read %d \n",nb_files/20);
+		while(get_next_seq_subset(&rseq,NULL,&readlen,NULL))
 		{
-			idx=0;
-			//skips NN
-			while(*pt_begin =='N' && pt_begin < (rseq+readlen))
-				pt_begin++;
-			// goes to next N or end of seq
-			while( (pt_begin[idx] !='N') && ((pt_begin+idx) < (rseq + readlen)) )
-			{	
-				idx++;
-			}
-			// we have  a seq begining at pt_begin of size idx, if idx > l, count l-mers and store them in the array
-			if(idx>=l)
+			//count l-mers from the read and store them in lmer_counts
+			pt_begin = rseq;	
+			while(pt_begin < (rseq + readlen))
 			{
-				//update kmer counts
-				int c_pt = 0; int lmer_to_read =idx-l+1;
-				long seed_graine = seed_lmer(pt_begin,l); //temporary
-				lmer_counts[seed_graine]++;
-				c_pt++; pt_begin+=l;
-				while(c_pt<lmer_to_read)
-				{
-					seed_graine = (seed_graine*4 + NT2int(pt_begin[0])) & lmer_mask;
-					lmer_counts[seed_graine]++;
-					c_pt++; pt_begin++;
+				idx=0;
+				//skips NN
+				while(*pt_begin =='N' && pt_begin < (rseq+readlen))
+					pt_begin++;
+				// goes to next N or end of seq
+				while( (pt_begin[idx] !='N') && ((pt_begin+idx) < (rseq + readlen)) )
+				{	
+					idx++;
 				}
-			}else{
-				pt_begin +=idx;
+				// we have  a seq begining at pt_begin of size idx, if idx > l, count l-mers and store them in the array
+				if(idx>=l)
+				{
+					//update kmer counts
+					int c_pt = 0; int lmer_to_read =idx-l+1;
+					long seed_graine = seed_lmer(pt_begin,l); //temporary
+					lmer_counts[seed_graine]++;
+					total_counts++;
+					c_pt++; pt_begin+=l;
+					while(c_pt<lmer_to_read)
+					{
+						seed_graine = (seed_graine*4 + NT2int(pt_begin[0])) & lmer_mask;
+						lmer_counts[seed_graine]++;
+						total_counts++;
+						c_pt++; pt_begin++;
+					}
+				}else{
+					pt_begin +=idx;
+				}
 			}
 		}
+		multiplication_factor = 20;
+	}else
+	{
+		while(get_next_seq(&rseq,NULL,&readlen,NULL))
+		{
+			//count l-mers from the read and store them in lmer_counts
+			pt_begin = rseq;	
+			while(pt_begin < (rseq + readlen))
+			{
+				idx=0;
+				//skips NN
+				while(*pt_begin =='N' && pt_begin < (rseq+readlen))
+					pt_begin++;
+				// goes to next N or end of seq
+				while( (pt_begin[idx] !='N') && ((pt_begin+idx) < (rseq + readlen)) )
+				{	
+					idx++;
+				}
+				// we have  a seq begining at pt_begin of size idx, if idx > l, count l-mers and store them in the array
+				if(idx>=l)
+				{
+					//update kmer counts
+					int c_pt = 0; int lmer_to_read =idx-l+1;
+					long seed_graine = seed_lmer(pt_begin,l); //temporary
+					lmer_counts[seed_graine]++;
+					total_counts++;
+					c_pt++; pt_begin+=l;
+					while(c_pt<lmer_to_read)
+					{
+						seed_graine = (seed_graine*4 + NT2int(pt_begin[0])) & lmer_mask;
+						lmer_counts[seed_graine]++;
+						total_counts++;
+						c_pt++; pt_begin++;
+					}
+				}else{
+					pt_begin +=idx;
+				}
+			}
+		}
+		multiplication_factor = 1;
 	}
 	// reestimate the number of partitions file required in total based on volume per partition limitation 
 	uint64_t total_partitions=0;
+	//int volume_size = estimate_kmers_volume(sizeKmer);
+	//printf("Total counts is %llu and size is %d \n",total_counts,volume_size);
+	printf("Factor for multiplication %llu\n",multiplication_factor);
+	if( multiplication_factor ==0 )
+		multiplication_factor = 1;
+	//printf("Factor for multiplication %llu\n",multiplication_factor);
 	for(int i=0;i<total_bins;i++)
 	{
 	//	printf("%d %lu\n",i,lmer_counts[i]);
 		//ensure that each partition file doesn't goes over 0.75 of its volume_per_partitions, due to skew in homopolymer chains
-		lmer_counts[i] = lmer_counts[i]*kmer_nbits/(1.0*1024*1024*8); // converting counts to MB
+		lmer_counts[i] = lmer_counts[i]*kmer_nbits*multiplication_factor/(1.0*1024*1024*8); // converting counts to MB
 //		lmer_counts[i]= ceil(lmer_counts[i]*kmer_nbits/(0.75*volume_per_partition)/1024/1024); 
 //		lmer_counts[i] = ceil(log(lmer_counts[i])/log(4));
 //		lmer_counts[i]= pow(4,lmer_counts[i]);
@@ -438,8 +536,11 @@ void Bank::count_kmers_for_small_value(int l, double *lmer_counts)
 	}
 	//return total_partitions;
 }
+
+
 uint64_t Bank::reestimate_partitions(int l)
 {
+//Depricated May 2014
 //reestimate the partitions size based on low kmer counts, as homo polymers will be more frequent in the database
 	printf("Re-estimating partitions sizes and number of passes based on %d-mers \n",l);
 	char * rseq;
@@ -527,28 +628,37 @@ uint64_t Bank::estimate_kmers_volume(int k)
     //int kmer_nbits = std::max(64,(int)pow(2,ceilf(log2f(2*k)))); // Bank assumes that a kmer is stored in the smallest integer type (e.g. uint64_t or uint128_t) // not accurate anymore with _ttmath/_largeint
     int kmer_nbits = sizeof(kmer_type)*8;
     rewind_all();
-    uint64_t volume = 0;
+    uint64_t total_volume = 0;
 
-    while (get_next_seq(&rseq,&readlen))
+    while ( index_file < nb_files ) 
     {
-        if (readlen >= k)
-            volume += (readlen-k+1) * (uint64_t) kmer_nbits;
-        if (NbRead++ == 1000)
-            break;
+	open_stream(index_file);
+	int NbRead = 0;
+	uint64_t volume_for_file = 0;
+	while (get_next_seq_from_file(&rseq,NULL,&readlen,NULL,index_file))
+    	{
+        	if (readlen >= k)
+      	     		volume_for_file += (readlen-k+1) * (uint64_t) kmer_nbits;
+        	if (NbRead++ == 100000)
+            		break;
+    	}
+  	if ( gztell(buffered_file[index_file]->stream) != 0) // empty file
+    	{    //return 1;
+
+            volume_for_file = (uint64_t) ( ( (float) volume_for_file ) * ( ( (float)(buffered_file[index_file]->estimated_filesize)) / ((float) gztell(buffered_file[index_file]->stream)) ) );
+            total_volume += volume_for_file;
+
+    	}
+	close_stream(index_file);
+	index_file++;
     }
-
-    if ( gztell(buffered_file[index_file]->stream) == 0) // empty file
-        return 1;
-
-    volume = (uint64_t) ( ( (float) volume ) * ( ( (float)filesizes ) / ((float) gztell(buffered_file[index_file]->stream)) ) );
-
-    volume = volume / 1024 /1024 /8; // put it in MB
+    total_volume = total_volume / 1024 /1024 /8; // put it in MB
     
-    if (volume == 0)  // tiny files fix
-        volume = 1;
+    if (total_volume == 0)  // tiny files fix
+        total_volume = 1;
 
     rewind_all();
-    return volume;
+    return total_volume;
 }
 
 // estimate the number of reads
@@ -710,7 +820,7 @@ void BinaryBankConcurrent::close()
           //      if (!fwrite(((void **)bufferT)[ii], sizeElement, cpt_buffer_tid[ii], binary_read_file))
 
             {
-  //              printf("error: can't fwrite (disk full?)\n");
+                printf("error: can't fwrite (disk full?)\n");
                 exit(1);
             }
         }
@@ -783,6 +893,7 @@ size_t BinaryBank::read_element_buffered( void *element)
 	//printf("number of elements read is %d %d \n",cpt_buffer,buffer_size_nelem);
 	if (cpt_buffer==0) return 0;
         //if(feof(binary_read_file)) { printf( "End of file reached 2 \n"); return 0; }
+        cpt_init_buffer = cpt_buffer;
     }
     memcpy(element, (unsigned char *)buffer + (cpt_buffer-1) * sizeElement, sizeElement);
     //printf("number of the cpt_buffer is %d \n",cpt_buffer);

@@ -19,6 +19,8 @@ typedef uint64_t kmer_type;
 
 extern int sizeKmer;
 extern kmer_type kmerMask;
+extern kmer_type kmerMaskm1;
+
 extern uint64_t nsolids;
 
 int NT2int(char nt);

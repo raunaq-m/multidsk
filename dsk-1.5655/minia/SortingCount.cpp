@@ -74,7 +74,6 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
     nb_threads = 8;
     max_memory /= nb_threads;
     max_memory = max (max_memory,1);
-    //max_memory *= nb_threads; // no parallelization in hash counting part
 #endif
     
     // temp bugfix: don't use compressed reads for long reads
@@ -98,13 +97,8 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
         {
             nb_partitions = (uint32_t) ceil((float) nb_partitions / load_factor);
             nb_partitions = ((nb_partitions * OAHash::size_entry() ) + sizeof(key_type)-1) / sizeof(key_type); // also adjust for hash overhead
-            //printf("Updated number of partitions for hash-based k-mer counting: %d\n",nb_partitions);
         }
 
-        // round nb_partitions to mulitple of nthreads, for better perf
-        //  nb_partitions = ((nb_partitions + nb_threads - 1) / nb_threads) * nb_threads;
-        
-        // get max number of open files
         struct rlimit lim;
         int max_open_files = 1000;
         int err = getrlimit(RLIMIT_NOFILE, &lim);
@@ -120,8 +114,6 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
     passes_hash = ceil(log(nb_passes)/log(4));
     partitions_hash = ceil(log(nb_partitions)/log(4));
     int size_for_reestimation = ceil((passes_hash + partitions_hash)*1.8);
-    //printf("volume per partition is %llu Passes hash Partitions hash %d %d \n",volume_per_partition,passes_hash,partitions_hash);
-   // reestimating number of partitions and passes based on l-mer counts 
     double * lmer_counts = (double * ) malloc(sizeof(long)*pow(4,size_for_reestimation));
     long * lmers_for_hash = (long * ) malloc(sizeof(long)*pow(4,size_for_reestimation));
     int * partitions_for_lmers =(int * ) malloc(sizeof(int)*pow(4,size_for_reestimation));
@@ -139,14 +131,7 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
 	{
 		//recompute the number of partitions based on updated partitions estimate
 		nb_partitions = ceil(temp_partition*1.0/nb_passes);
-		//printf("new no of partitions is %lu \n",nb_partitions);
-//		if( use_hashing) 
-//		//		{
-//          	   nb_partitions = (uint32_t) ceil((float) nb_partitions / load_factor);
-//           	   nb_partitions = ((nb_partitions * OAHash::size_entry()) + sizeof(key_type)-1) / sizeof(key_type); // also adjust for hash overhead
-//		}
-//		printf("new no of partitions after OAHash thing is %lu \n",nb_partitions);
-        	struct rlimit lim;
+		struct rlimit lim;
 	        int max_open_files = 1000;
 	        int err = getrlimit(RLIMIT_NOFILE, &lim);
 	        if (err == 0)
@@ -157,76 +142,8 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
         	    break;
 	}while(1);
     	printf("no of partitions before %lu and after %d passes %lu \n",nb_partitions*nb_passes,temp_partition,nb_passes);
-	// compute the partition depths and kmer to match in each partition file 
-	/*int *partition_kmer_depth = (int * ) malloc(sizeof(int)*temp_partition);
-	for (int j =0; j<temp_partition;j++)
-		partition_kmer_depth[j]=passes_hash+partitions_hash;
-	uint32_t *match_partition = (uint32_t * ) malloc(sizeof(uint32_t) * temp_partition);
-	compute_partition_hashing_kmers(temp_partition,lmer_counts,partition_kmer_depth,match_partition);
-	int min_kmer_depth = compute_min_kmer_depth(temp_partition,partition_kmer_depth);
-	//printf("Min kmer depth is %d \n",min_kmer_depth);
-	//Verifying whether the partitions thing is okay or not.
-	for( int j=0;j<temp_partition;j++)
-		printf("%d depth %d match %lu \n",j,partition_kmer_depth[j],match_partition[j]);
-	
-	printf("no of passes %lu, no of partitions %lu \n",nb_passes,nb_partitions);*/
-    //printf("memory %d temp partition %llu \n",max_memory,temp_partition);
-    /*while( temp_partition > max_memory )
-    {
-		passes_hash++;
-		nb_passes = pow(4,passes_hash);
-		up_passes_size = volume / 16; // max number of passes allowed after readjustment
-		nb_partitions =  ( up_passes_size / max_memory) + 1;
-		partitions_hash=ceil(log(nb_partitions)/log(4));
-		printf("p hash, n partitions,pass hash, n pass, %d, %lu, %d, %lu %llu \n",partitions_hash,nb_partitions,passes_hash,nb_passes,up_passes_size);
-		if (use_hashing) 
-		{
-			nb_partitions = (uint32_t) ceil((float) nb_partitions / load_factor);
-			nb_partitions = ((nb_partitions * OAHash::size_entry()*totalKmers) + sizeof(key_type)-1) / sizeof(key_type) ; 
-		}
-		partitions_hash=ceil(log(nb_partitions)/log(4));
-		nb_partitions = pow(4,partitions_hash);
-		printf("p hash, n partitions,pass hash, n pass, %d, %lu, %d, %lu \n",partitions_hash,nb_partitions,passes_hash,nb_passes);
-		temp_partition = Sequences->reestimate_partitions(passes_hash+partitions_hash);
-		printf("Size of repartitions %llu %llu %lu %lu\n",temp_partition,up_passes_size/nb_partitions,nb_passes,nb_partitions);
-		struct rlimit lim;
-		int max_open_files =1000;
-		int err = getrlimit(RLIMIT_NOFILE,&lim);
-		if (err=0)
-			max_open_files = lim.rlim_cur / 2;
-		if (nb_partitions >= max_open_files)
-			passes_hash++;
-    }
-    passes_hash = ceil(log(nb_passes)/log(4));
-    partitions_hash = ceil(log(nb_partitions)/log(4));
-    while(passes_hash>2 ) 
-    {
-	// Increase the number of partitions so that the number of partitions is not more than 16 
-	int temp_change = passes_hash-2;
-	struct rlimit lim;
-	int max_open_files =1000;
-	int err = getrlimit(RLIMIT_NOFILE,&lim);
-	if (err=0)
-		max_open_files = lim.rlim_cur / 2;
-	if(pow(4,partitions_hash)<max_open_files) 
-	{
-		partitions_hash++;
-		passes_hash--;
-	}else
-	{
-		partitions_hash--;
-		passes_hash++;
-		break;
-	}
-    }
-    nb_passes = pow(4,passes_hash);
-    nb_partitions = pow(4,partitions_hash);
-    printf("Passes hash Partitions hash %d %d \n",passes_hash,partitions_hash);
-    */ 
-// volume / (sizeof(kmer_type)*4)   is approx size of read file stored in binary, read nb_passes -1 times
     uint64_t total_IO =   volume * 2LL * 1024LL*1024LL   ;// in bytes  +   nb_passes * ( volume / (sizeof(kmer_type)*4) )    ; // in bytes
     uint64_t temp_IO = 0;
-    //if (nb_passes==1) use_compressed_reads=false;
     BinaryBankConcurrent * redundant_partitions_file[nb_partitions]; 
     char redundant_filename[nb_partitions][256];
     kmer_type kmer;
@@ -244,7 +161,7 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
 
     mkdir(temp_dir, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
     
-
+    // Open totalKmers files to store counts of totalKmers different k's
     BinaryBankConcurrent * SolidKmers[totalKmers];
     for (int s=0;s<totalKmers;s++) 
     {	
@@ -375,37 +292,20 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
 	// stop computing if all partitions are done Added by Raunaq
         if (iter_partition==temp_partition)
 		break;
-        //OAHash part_hash(max_memory*1024LL*1024LL);
-        //unordered_map<uint32_t,uint32_t> part_hash;
 	if(use_compressed_reads ) //open binary reads for reading
             binread->open(false);
         
         STARTWALL(debpass);
         STARTWALL(debw);
-	//long initial_value = match_partition[iter_partition] & ((((long)1)<<(2*min_kmer_depth))-1);
 	int initial_value = current_pass*nb_partitions;
         for (uint32_t p=0;p<nb_partitions;p++)
         {
             sprintf(redundant_filename[p],"%s/partition%d.redundant_kmers",temp_dir,p);
             redundant_partitions_file[p] =  new BinaryBankConcurrent (redundant_filename[p],sizeof(kmer_type),true, nb_threads);
             distinct_kmers_per_partition[p]=0;
-            // add hashing entries to the partition_hash
-	   //pair<uint32_t,uint32_t> temp_pair(match_partition[iter_partition],p);
-	   //part_hash.insert (temp_pair); // Add element to the hash 
-	   //iter_partition++;
-	}
-	//long final_value = match_partition[iter_partition-1] & ((((long)1)<<(2*min_kmer_depth))-1);
+       	}
 	int final_value = ((current_pass+1)*nb_partitions)-1;
-	//printf("Initital and final values are %lu , %lu  iter partition %d \n",initial_value,final_value,iter_partition);
-	printf("Initital and final values are %d , %d \n",initial_value,final_value);
-	/*for ( unsigned it = 0; it < part_hash.bucket_count(); ++it) {
-	    printf("bucket # %u contains:",it);
-	for ( auto local_it = part_hash.begin(it); local_it!= part_hash.end(it); ++local_it )
-    	  printf(" %lu : %lu ",local_it->first ,local_it->second);
-	    printf("\n");
-  	} */// for printing the bucket informations
-        // partitioning redundant kmers
-        
+	printf("Storing k-mers in partition files between %d and %d \n",initial_value,final_value);
         Sequences->rewind_all();
 #if !SINGLE_BAR
         Progress progress;
@@ -477,8 +377,6 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
                     nbkmers = kbuff->nkmers;
                     kmer_table = kbuff->kmers_buffer;
 		    kmer_length_info = kbuff->kmer_length;
-                   // printf("nb kmers read  %lli \n",nbkmers);
-                 //   NbRead+= nreads_in_buffer;
                 } 
                 else //old fashion   
                 {
@@ -502,19 +400,8 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
 
                     lkmer = kmer_table[i];
 		    lkmer_length = kmer_length_info[i];
-		    //zero = code2seq(lkmer,temp_kmer);
-                    // some hashing to uniformize repartition
-                    /*kmer_type kmer_hash = lkmer ^ (lkmer >> 14);
-                    kmer_hash = (~kmer_hash) + (kmer_hash << 18); 
-                    kmer_hash = kmer_hash ^ (kmer_hash >> 31);
-                    kmer_hash = kmer_hash * 21; 
-                    kmer_hash = kmer_hash ^ (kmer_hash >> 11);
-                    kmer_hash = kmer_hash + (kmer_hash << 6);
-                    kmer_hash = kmer_hash ^ (kmer_hash >> 22);
-		    */
-   	  	    //int pass_lkmer = code2first_n_nucleotide(lkmer,passes_hash);
-   	  	    //uint32_t pass_lkmer = lkmer & ( (((uint32_t)1)<<(2*min_kmer_depth))-1);
-   	  	    long pass_lkmer = code2first_n_nucleotide(lkmer,size_for_reestimation);
+		   // zero = code2seq(lkmer,temp_kmer);
+      	  	    long pass_lkmer = code2first_n_nucleotide(lkmer,size_for_reestimation);
 		    unordered_map<long,int>::const_iterator got = part_hash.find(pass_lkmer);
 		    int p;// compute in which partition this kmer falls into
 		    if(got==part_hash.end())
@@ -522,12 +409,9 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
 		    else
 			p = got->second; 
                     // check if this kmer should be included in the current pass
-                    //if ((kmer_hash % nb_passes  ) != current_pass) 
-                    //if(!(pass_lkmer >= initial_value && pass_lkmer <= final_value))
                     if(!(p >= initial_value && p<= final_value))
 			    continue;
 
-                    //kmer_type reduced_kmer = kmer_hash / nb_passes;
 
 /*		
 #ifdef _ttmath
@@ -536,35 +420,10 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
                     p = reduced_kmer % nb_partitions;
 #endif
 */
-		    //p = code2first_n_nucleotide(lkmer,partitions_hash,passes_hash); //Added by Raunaq
-		    // int p_int = log(lmer_counts[pass_lkmer]); //compute if extra l-mer to be computed 
-		    //uint32_t inter =  lkmer & ( (((uint32_t)1)<<(2*(min_kmer_depth+p_int)))-1);
-		    //uint32_t inter;
-		    //if(p_int==0)
-		//	inter = pass_lkmer;
-		 //   else 
-		  //	inter = code2first_n_nucleotide(lkmer,min_kmer_depth + p_int);
-		    //unordered_map<uint32_t,uint32_t>::const_iterator got = part_hash.find(inter);
-		    //part_hash.get(inter,q);
-		    //if(got==part_hash.end())
-		    	//printf("No match for hash %lu %d %lu %lu \n",pass_lkmer,p_int+min_kmer_depth,lmer_counts[pass_lkmer],inter);
-		   //	continue; 
-		   //else 
-		//	    p = (int)got->second; 
-		   /* if(pass_lkmer==19174)
-		    {
-		    	zero = code2seq(lkmer,temp_kmer);
-		    	printf("in store %s %lu\n",temp_kmer,pass_lkmer);
-		    	it_zero_wrt++;
-		    }*/
 		    p = p - current_pass*nb_partitions;  
                     nbkmers_written++;
-		    //printf("%lu %d %lu\n",pass_lkmer,p,current_pass);
 
                     redundant_partitions_file[p]->write_element_buffered(&lkmer,tid); // save this kmer to the right partition file
-		    //printf("Length of kmer_length being stored %d\n",lkmer_length);
-		    //if (lkmer_length<sizeKmer)
-                    //	printf("kmer %s length %d\n",temp_kmer,lkmer_length);
 		    redundant_partitions_file[p]->write_buffered(&lkmer_length,sizeof(lkmer_length),tid,false); // save the kmer length next to the kmer in the same partition file
 		    // total_kmers_per_partition[p]++; // guillaume probably commented it because updating this variable would require synchronization
 
@@ -622,14 +481,11 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
         }
         STARTWALL(debtri);
 	
-	//remove partition_hash
-	//part_hash.~unmapped();
 
-        // close partitions and open them for reading
 
             for (uint32_t p=0;p<nb_partitions;p++)
-            {
-				redundant_partitions_file[p]->close();
+            {	
+		redundant_partitions_file[p]->close();
                 redundant_partitions_file[p]->open(false);
             }
 
@@ -650,7 +506,6 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
         // TODO to guillaume: remove that todo above, because it is done, right?
         kmer_type lkmer,lkmer_length,lkmer_temp,exp;
 	long it_zero=0;
-	//OAHash * hash[totalKmers];
 	OAHash * hash;
 	int p,s;
 #if OMP 
@@ -660,16 +515,12 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
         // load, sort each partition to output solid kmers
         for ( p=0;p<nb_partitions;p++)
         {
-			//printf("Starting counting partition %d \n",p);
-			//kmer_type lkmer;
-			//kmer_type lkmer_length;
 			char temp_kmer[256];  // bug check code 
 			int zero;
 				
            	bool use_hashing_for_this_partition = use_hashing;
 			if(hybrid_mode)
 			{
-				//  printf("max mem %i MB  ,   parti size %i MB\n",max_memory,(redundant_partitions_file[p]->nb_elements()*sizeof(kmer_type))/1024LL/1024LL);
 				if(   (redundant_partitions_file[p]->nb_elements()*sizeof(kmer_type)) <  (max_memory*1024LL*1024LL) )  // Maintain totalKmers hash for each partition file
 				{	
 					use_hashing_for_this_partition = false;
@@ -690,8 +541,6 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
             {
                 // hash partition and save to solid file
 				
-				//for(s=0;s<totalKmers;s++) 
-				//	hash[s] = new OAHash(max_memory*1024LL*1024LL/totalKmers); // There will be totalKmers hashes being operated at the same time to store into the totalKmers file
 				hash = new OAHash(max_memory*1024LL*1024LL/2); // One hash to store all types of k-mer lengths
 
 				uint64_t nkmers_read=0;
@@ -715,13 +564,6 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
 						break;
 					}
 					nkmers_read++;
-						//long pass_lkmer = code2first_n_nucleotide(lkmer,size_for_reestimation);
-					/*if(pass_lkmer==19174)
-					{
-							zero = code2seq(lkmer,temp_kmer);
-							printf("read %s %lu\n",temp_kmer,pass_lkmer);
-							it_zero++;
-					}*/
 #if SINGLE_BAR
 					if(verbose==0 && nkmers_read==10000)
 					{
@@ -733,16 +575,12 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
 					}
 #endif
                 }
-			//printf("Value of it_zero is %lu \n",it_zero);
-                
-                //single bar
                 
                 
 				if (verbose >= 2)
 					 printf("Pass %d/%d partition %d/%d hash load factor: %0.3f\n",current_pass+1,nb_passes,p+1,nb_partitions,hash->load_factor());
                 	for( s=0;s<totalKmers;s++) 
 					{
-             	   		//printf("Writing kmers for k = %d \n",Kmerlist[s]);
 						hash->start_iterator();
 						while (hash->next_iterator())
                 		{
@@ -755,7 +593,6 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
 #if OMP
 							 histo_count_omp[tid][saturated_abundance]++;
 #else
-							 //printf("histo_count 0 1  2 %i %i %i \n",histo_count[0],histo_count[1],histo_count[2]);
 					
 							 histo_count[saturated_abundance]++;
 #endif
@@ -768,7 +605,6 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
 								 NbSolid_omp[tid]++;
 								if (write_count)
 										SolidKmers[s]->write_buffered(&abundance, sizeof(abundance),tid, false);
-										//SolidKmers[s]->write_buffered(&abund_tid, sizeof(abund_tid),tid, false);
 							}
 		                    distinct_kmers_per_partition[p]++;
 						}
@@ -803,7 +639,8 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
             
 			else
 			{
-				// sort partition and save to solid file
+				// This part does it in slower fashion
+				// sort partition and save to solid file 
         	    //vector < kmer_type > kmers;
 				vector < kmer_type > kmers[totalKmers];
                 uint64_t nkmers_read=0;

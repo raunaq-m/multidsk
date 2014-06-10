@@ -32,6 +32,7 @@ protected:
     };
 
     uint64_t hash_size;
+    uint64_t nb_inserted_keys;
     element_pair* data;
 
 #ifdef _largeint
@@ -64,7 +65,7 @@ public:
     void insert(key_type graine, int value,int length);
     void increment(key_type graine,int length);
     void increment_by_value(key_type graine,int value, int length);
-    void delete_key(key_type graine); 
+    //void delete_key(key_type graine); 
 
     bool get( key_type graine, int * val, int * length);
     bool has_key(key_type graine);

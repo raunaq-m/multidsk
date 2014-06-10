@@ -13,6 +13,7 @@ using namespace std;
 int sizeKmer;
 uint64_t nsolids = 0;
 kmer_type kmerMask;    
+kmer_type kmerMaskm1;
 
 int NT2int(char nt)
 {
@@ -57,6 +58,7 @@ unsigned char  code_n_NT(char *seq, int nb)
 
 kmer_type compute_exponent(int *length)
 {
+	// Just use left shift operations instead of the function
 	kmer_type exp=3;
 	for(int i=1;i<*length;i++){
 		exp = exp*4 + 3;

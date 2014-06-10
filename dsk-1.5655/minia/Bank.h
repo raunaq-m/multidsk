@@ -36,6 +36,7 @@ typedef struct
     bool eof;
     char last_char;
     char *fname;
+    uint64_t estimated_filesize;
 } buffered_file_t;
 
 typedef struct 
@@ -54,7 +55,7 @@ class Bank{
         void init(char **fname, int nb_files_);
         void close();
 
-	void open_stream(int i);
+	void open_stream(int i);  //internal functions
 	void close_stream(int i);
 
 	void load_position();
@@ -64,11 +65,16 @@ class Bank{
 
         bool get_next_seq(char **nseq, int *len);
         bool get_next_seq_from_file(char **nseq, int *len, int file_id);
+
     
         bool get_next_seq_from_file(char **nseq, char **cheader, int *len, int *hlen, int file_id);
         bool get_next_seq(char **nseq, char **cheader, int *len, int *hlen);
-
-        void rewind_all();
+	bool get_next_seq_subset(char **nseq, char **cheader, int *len, int *hlen);
+	
+        bool get_next_seq(char **nseq, char **cheader, int *len, int *hlen, int  * id_file);//also return file id
+        bool get_next_seq(char **nseq, int *len, int * id_file); //also return file id
+        
+	void rewind_all();
 
         variable_string_t *read, *dummy, *header;
 
@@ -98,6 +104,8 @@ class BinaryBank
         const int sizeElement;
         void * buffer;
         int cpt_buffer;
+	int cpt_init_buffer;
+
     int buffer_size_nelem;
     public:
         BinaryBank(char *filename, int sizeElement, bool write);
@@ -105,7 +113,6 @@ class BinaryBank
         void write_element(void *element);
         size_t read_element(void *element);
         size_t read_element_buffered(void *element);
-	//size_t read_element_buffered(void *element, int size); // Added by Raunaq to read a different sized bit from the buffered file
 
         void write( void *element, int size);
         void write_element_buffered(void *element);
@@ -186,7 +193,7 @@ class KmersBuffer
     int nseq_step;
     int buffer_size;
     kmer_type * kmers_buffer;
-    kmer_type * kmer_length; // Added by Raunaq, for simplicity, I can't get it to work with lower space
+    kmer_type * kmer_length; // Added by Raunaq, for simplicity, length also stored in kmer_type
     KmersBuffer(BinaryReads *bfile, int  pbuffer_size, int nseq_task );
     int readkmers();
     char * binSeq;// [MAX_READ_LENGTH];
@@ -197,7 +204,7 @@ class KmersBuffer
 };
 
 void  compute_kmer_table_from_one_seq(int readlen, char * seq, kmer_type * kmer_table )  ;
-void  compute_kmer_table_from_one_seq(int readlen, char * seq, kmer_type * kmer_table, kmer_type * kmer_length_table, int sizesmallest )  ;
+void  compute_kmer_table_from_one_seq(int readlen, char * seq, kmer_type * kmer_table, kmer_type * kmer_length_table, int sizesmallest )  ; //for uncompressed reads compute table for multiple k
 void  compute_partition_hashing_kmers(uint64_t no_partition,long * lmer_counts,int * partition_kmer_depth,uint32_t *match_partition);
 int compute_min_kmer_depth(uint64_t no_partition,int *partition_kmer_depth);
 

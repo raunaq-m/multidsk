@@ -56,6 +56,8 @@ int reestimate_partitions(int size_of_lmers,uint64_t partition_volume,double * l
 	// sort the counts of kmers and maintain their index 
 	sort(sorted_lmers.begin(),sorted_lmers.end(),comparator);
 	double current_vol=0; int part = 0, iter=0, items_in_cur = 0;
+	FILE *cTrack = fopen("write_counts.txt","w");
+	double min = 100;
 	for(vector<clmer>::iterator it=sorted_lmers.begin(); it!=sorted_lmers.end();++it)
 	{
 		clmer temp = *it;
@@ -70,6 +72,13 @@ int reestimate_partitions(int size_of_lmers,uint64_t partition_volume,double * l
 		// }
 		// else
 		// {
+		if(temp.second !=0)
+			if(temp.second < min)
+				min = temp.second;
+		if(temp.second ==0)
+			temp.second = min;
+
+		// Make sure that a single file doesn't gets too many small k-mer counts
 		current_vol +=temp.second;
 		if(current_vol <= partition_volume)
 		{	
@@ -91,6 +100,7 @@ int reestimate_partitions(int size_of_lmers,uint64_t partition_volume,double * l
 			partition_files[iter] = part;
 		}
 		//}
+		fprintf(cTrack,"iterr %d kmer count %f,current vol %f, kmer %lu, partiti    on file %d\n",iter, temp.second,current_vol,hash_vals[iter],partition_files[iter]);
 		//printf("iterr %d kmer count %f,current vol %f, kmer %lu, partition file %d\n",iter, temp.second,current_vol,hash_vals[iter],partition_files[iter]);
 		iter++;
 	}
@@ -104,6 +114,7 @@ int reestimate_partitions(int size_of_lmers,uint64_t partition_volume,double * l
 		iter++;
 	}
 */
+	fclose(cTrack);
 	return part+1;
 }
 

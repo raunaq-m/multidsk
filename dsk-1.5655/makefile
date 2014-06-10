@@ -1,6 +1,5 @@
-SVNREV = -DSVN_REV=1.5655
 CC=g++
-PROGNAME=dsk
+PROGNAME=multi-dsk
 CFLAGS= -O4 -std=c++0x
 LDFLAGS=  -lz $(SVNRV)
 SRC=minia/Pool.cpp minia/Bank.cpp minia/Bloom.cpp minia/Hash16.cpp minia/Kmer.cpp minia/Set.cpp minia/Utils.cpp  minia/SortingCount.cpp  minia/LinearCounter.cpp minia/OAHash.cpp minia/LargeInt.cpp minia/loadKmers.cpp

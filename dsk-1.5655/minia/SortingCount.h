@@ -9,7 +9,7 @@
 #include <sys/statvfs.h> // to determine available disk space
 #include <dirent.h> // to clear the temp directory
 #include <cmath>
-#include <unordered_map>
+#include <unordered_map> // to map small kmer counts which decides the partitions into which k-mers are separated
 
 #ifndef SORTINGCOUNT_H
 #define SORTINGCOUNT_H
