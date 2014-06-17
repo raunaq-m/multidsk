@@ -1226,7 +1226,7 @@ int KmersBuffer::readkmers()
 	if( ! fread(&block_size,sizeof(unsigned int),1, binary_read_file)) //read block header
         {
             funlockfile(binary_read_file);
-            return 0; // no more blocks to read
+            return -1; // no more blocks to read
         }
         
         

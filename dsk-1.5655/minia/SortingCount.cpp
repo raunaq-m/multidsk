@@ -350,7 +350,7 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
                 if(use_compressed_reads) // && current_pass>0
                 {
                     nread = kbuff->readkmers();
-                    if(! nread) break;
+                    if( nread < 0) break;
                     NbRead+= nread;
                     tempread+= nread;
                 }

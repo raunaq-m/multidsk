@@ -16,7 +16,7 @@ endif
 
 
 ifeq ($(omp),1)
- CFLAGS=-O4 -std=c++0x -fopenmp -DOMP=1
+ CFLAGS+=-O4 -std=c++0x -fopenmp -DOMP=1
 endif
 
 ifeq ($(osx),1)
