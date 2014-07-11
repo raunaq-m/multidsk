@@ -1129,7 +1129,7 @@ void  compute_kmer_table_from_one_seq(int readlen, char * seq, kmer_type * kmer_
     }
 }
 
-void compute_kmer_table_from_one_seq(int readlen, char * seq, kmer_type * kmer_table,kmer_type * kmer_length_table, int sizesmallest)
+void compute_kmer_table_from_one_seq(int readlen, char * seq, kmer_type * kmer_table,int * kmer_length_table, int sizesmallest)
 {
 	int diffK = sizeKmer - sizesmallest;
 	int smallK_read = 0;
@@ -1176,7 +1176,8 @@ KmersBuffer::KmersBuffer(BinaryReads *bfile, int  pbuffer_size, int nseq_task )
     binfile = bfile;
     buffer_size = pbuffer_size;
     kmers_buffer =  (kmer_type *) malloc(sizeof(kmer_type) * buffer_size);
-    kmer_length = (kmer_type *) malloc(sizeof(kmer_type) * buffer_size); // Added by raunaq; so that we have a length of kmer stored along with the kmer
+    //kmer_length = (kmer_type *) malloc(sizeof(kmer_type) * buffer_size); // Added by raunaq; so that we have a length of kmer stored along with the kmer
+    kmer_length = (int*) malloc(sizeof(int) * buffer_size); // Added by raunaq; so that we have a length of kmer stored along with the kmer
    // binSeq =  (char *) malloc(sizeof(char) * max_read_length); // no need to alloc ram for binse : will points to buffer
     binSeq_extended =  (char *) malloc(sizeof(char) * max_read_length);
     blocksize_toread =0;

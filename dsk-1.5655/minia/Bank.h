@@ -193,7 +193,8 @@ class KmersBuffer
     int nseq_step;
     int buffer_size;
     kmer_type * kmers_buffer;
-    kmer_type * kmer_length; // Added by Raunaq, for simplicity, length also stored in kmer_type
+    //kmer_type * kmer_length; // Added by Raunaq, for simplicity, length also stored in kmer_type
+	int * kmer_length;
     KmersBuffer(BinaryReads *bfile, int  pbuffer_size, int nseq_task );
     int readkmers();
     char * binSeq;// [MAX_READ_LENGTH];
@@ -204,7 +205,8 @@ class KmersBuffer
 };
 
 void  compute_kmer_table_from_one_seq(int readlen, char * seq, kmer_type * kmer_table )  ;
-void  compute_kmer_table_from_one_seq(int readlen, char * seq, kmer_type * kmer_table, kmer_type * kmer_length_table, int sizesmallest )  ; //for uncompressed reads compute table for multiple k
+//void  compute_kmer_table_from_one_seq(int readlen, char * seq, kmer_type * kmer_table, kmer_type * kmer_length_table, int sizesmallest )  ; //for uncompressed reads compute table for multiple k
+void  compute_kmer_table_from_one_seq(int readlen, char * seq, kmer_type * kmer_table,int * kmer_length_table, int sizesmallest )  ; //for uncompressed reads compute table for multiple k
 void  compute_partition_hashing_kmers(uint64_t no_partition,long * lmer_counts,int * partition_kmer_depth,uint32_t *match_partition);
 int compute_min_kmer_depth(uint64_t no_partition,int *partition_kmer_depth);
 

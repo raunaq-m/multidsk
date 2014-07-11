@@ -144,6 +144,22 @@ kmer_type extractKmerFromRead(char *readSeq, int position, kmer_type *graine, km
     return  min(*graine,*graine_revcomp);
 }
 
+int convert_to_int( kmer_type length)
+{
+	int result;
+#ifdef _largeint
+	LargeInt<KMER_PRECISION> t = length;
+	result = t.toInt();
+#else
+#ifdef _ttmath
+	ttmath::UInt<KMER_PRECISION> t = length;
+	t.ToInt(result);
+#else
+	result = length;
+#endif
+#endif
+	return result;
+}
 
 int first_nucleotide(kmer_type kmer)
 {

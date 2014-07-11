@@ -18,10 +18,6 @@ extern int *Kmerlist;
 extern unordered_map<int,int> kmerlength_map; //Map of largest length to smallest length 
 bool output_histo;
 
-struct kmer_set_t
-{
-    unsigned char raw_data[sizeof(int)+sizeof(kmer_type)];
-};
 
 // main k-mer counting function, shared between minia and dsk
 // verbose == 0 : stderr progress bar
@@ -67,7 +63,7 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
 
     // estimate number of iterations TODO Check if multiplication with totalKmers is actually required or not. It may be just increasing number of partitions for no reason
     //uint64_t volume = totalKmers*Sequences->estimate_kmers_volume(smallestKmer);  //Since there are totalKmers no of kmers and an upper bound can be estimated by using the smallest size of kmer. Added by Raunaq
-    uint64_t volume = Sequences->estimate_kmers_volume(smallestKmer) * 2;  //Since there are totalKmers no of kmers and an upper bound can be estimated by using the smallest size of kmer. Added by Raunaq, the factor of two is for doubling the reads to forward and reverse strandds 
+    uint64_t volume = Sequences->estimate_kmers_volume(smallestKmer);  //Since there are totalKmers no of kmers and an upper bound can be estimated by using the smallest size of kmer. Added by Raunaq
     uint32_t nb_passes = ( volume / max_disk_space ) + 1;
     int passes_hash ;
     
@@ -153,7 +149,7 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
     kmer_type kmer;
     int max_read_length = KMERSBUFFER_MAX_READLEN;
     kmer_type * kmer_table_seq = (kmer_type * ) malloc(sizeof(kmer_type)*max_read_length); ;
-    int * kmer_length_table_seq = (int * ) malloc(sizeof(kmer_type)*max_read_length);
+    kmer_type * kmer_length_table_seq = (kmer_type * ) malloc(sizeof(kmer_type)*max_read_length);
 
     BinaryReads *  binread = NULL;
     if(use_compressed_reads)
@@ -226,7 +222,7 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
             {
                 max_read_length = 2*readlen;
                 kmer_table_seq = (kmer_type * ) realloc(kmer_table_seq,sizeof(kmer_type)*max_read_length);
-            	kmer_length_table_seq = (int * ) realloc(kmer_length_table_seq,sizeof(int)*max_read_length);
+            	kmer_length_table_seq = (kmer_type * ) realloc(kmer_length_table_seq,sizeof(kmer_type)*max_read_length);
 	    }
             
             pt_begin = rseq;
@@ -308,7 +304,7 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
         for (uint32_t p=0;p<nb_partitions;p++)
         {
             sprintf(redundant_filename[p],"%s/partition%d.redundant_kmers",temp_dir,p);
-            redundant_partitions_file[p] =  new BinaryBankConcurrent (redundant_filename[p],sizeof(kmer_type)+sizeof(int),true, nb_threads);
+            redundant_partitions_file[p] =  new BinaryBankConcurrent (redundant_filename[p],sizeof(kmer_type),true, nb_threads);
             distinct_kmers_per_partition[p]=0;
        	}
 	int final_value = ((current_pass+1)*nb_partitions)-1;
@@ -349,7 +345,7 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
             }
 
             kmer_type * kmer_table ;
-            int * kmer_length_info ; // Added by Raunaq, to store the length of read into the partitions file
+            kmer_type * kmer_length_info ; // Added by Raunaq, to store the length of read into the partitions file
 	    while(1)
             {
 
@@ -368,7 +364,7 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
                     {
                         max_read_length = 2*readlen;
                         kmer_table_seq = (kmer_type * ) realloc(kmer_table_seq,sizeof(kmer_type)*max_read_length);
-            		kmer_length_table_seq = (int * ) realloc(kmer_length_table_seq,sizeof(int)*max_read_length);
+            		kmer_length_table_seq = (kmer_type * ) realloc(kmer_length_table_seq,sizeof(kmer_type)*max_read_length);
                     }
 
                 }
@@ -402,7 +398,7 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
                 for (i=0; i<nbkmers; i++)
                 {
                     kmer_type lkmer;
-					int lkmer_length;
+					kmer_type lkmer_length;
                     // kmer = extractKmerFromRead(rseq,i,&graine,&graine_revcomp);
 
                     lkmer = kmer_table[i];
@@ -430,8 +426,8 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
 					p = p - current_pass*nb_partitions;  
                     nbkmers_written++;
 
-                    redundant_partitions_file[p]->write_buffered(&lkmer,sizeof(kmer_type),tid,true); // save this kmer to the right partition file
-					redundant_partitions_file[p]->write_buffered(&lkmer_length,sizeof(int),tid,false); // save the kmer length next to the kmer in the same partition file
+                    redundant_partitions_file[p]->write_element_buffered(&lkmer,tid); // save this kmer to the right partition file
+					redundant_partitions_file[p]->write_buffered(&lkmer_length,sizeof(lkmer_length),tid,false); // save the kmer length next to the kmer in the same partition file
 		    // total_kmers_per_partition[p]++; // guillaume probably commented it because updating this variable would require synchronization
 
                 }
@@ -511,9 +507,8 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
         //quick and dirty parall with omp, testing
         //todo if we want omp and histo : separate histo_count tab per thread that needs to be merged at the end
         // TODO to guillaume: remove that todo above, because it is done, right?
-        kmer_type lkmer,lkmer_temp,exp;
+        kmer_type lkmer,lkmer_length,lkmer_temp,exp;
 	long it_zero=0;
-	int lkmer_length;
 	OAHash * hash;
 	int p,s;
 #if OMP 
@@ -526,9 +521,7 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
 			char temp_kmer[256];  // bug check code 
 			int zero;
 			kmer_type lkmer_revcomp; // to store revcomps
-			kmer_set_t kmer_set;
-			kmer_type *lkmer_ptr;
-			int *lkmerlength_ptr;
+				
            	bool use_hashing_for_this_partition = use_hashing;
 			if(hybrid_mode)
 			{
@@ -555,28 +548,25 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
 				hash = new OAHash(max_memory*1024LL*1024LL/2); // One hash to store all types of k-mer lengths
 
 				uint64_t nkmers_read=0;
-				//redundant_partitions_file[p]->read_element_buffered(&lkmer_length);
+				redundant_partitions_file[p]->read_element_buffered(&lkmer_length);
 
-				while (redundant_partitions_file[p]->read_element_buffered( &(kmer_set.raw_data[0]) ) )
+				while (redundant_partitions_file[p]->read_element_buffered(&lkmer))
 				{
-					lkmer_ptr = (kmer_type*) &(kmer_set.raw_data[0]);
-					lkmer = *lkmer_ptr;
-					lkmerlength_ptr = (int*) &(kmer_set.raw_data[sizeof(kmer_type)]);
-					lkmer_length = *lkmerlength_ptr;
+			
 					if(lkmer_length == Kmerlist[0])  //only add the largest k-mer 
-						hash->increment(lkmer,lkmer_length);
+						hash->increment(lkmer,convert_to_int(lkmer_length));
 					else
 					{
-						unordered_map<int,int>::const_iterator got = kmerlength_map.find(lkmer_length);
+						unordered_map<int,int>::const_iterator got = kmerlength_map.find(convert_to_int(lkmer_length));
 						exp = (((kmer_type)1)<<(got->second*2))-1;
 						lkmer_temp = lkmer & exp;
 						hash->increment(lkmer_temp,got->second);
 
 					}	
-					/*if(!redundant_partitions_file[p]->read_element_buffered(&lkmer_length)) 
+					if(!redundant_partitions_file[p]->read_element_buffered(&lkmer_length)) 
 					{
 						break;
-					}*/
+					}
 					nkmers_read++;
 #if SINGLE_BAR
 					if(verbose==0 && nkmers_read==10000)
@@ -656,13 +646,9 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
                 uint64_t nkmers_read=0;
                	//int s=0; 
 				
-				//redundant_partitions_file[p]->read_element_buffered(&lkmer_length);
-				while (redundant_partitions_file[p]->read_element_buffered ( &(kmer_set.raw_data[0]) ))
+				redundant_partitions_file[p]->read_element_buffered(&lkmer_length);
+				while (redundant_partitions_file[p]->read_element_buffered (&lkmer))
 				{
-					lkmer_ptr = (kmer_type*) &(kmer_set.raw_data[0]);
-					lkmer = *lkmer_ptr;
-					lkmerlength_ptr = (int*) &(kmer_set.raw_data[sizeof(kmer_type)]);
-					lkmer_length = *lkmerlength_ptr;
     		        for(s=0;s<totalKmers;s++)
 					{
 						//kmer_type lkmer_temp;
@@ -679,7 +665,7 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
 						}
                     }
 					nkmers_read++;
-					//if(!redundant_partitions_file[p]->read_element_buffered(&lkmer_length)) break;  //Added to get the next length of kmer
+					if(!redundant_partitions_file[p]->read_element_buffered(&lkmer_length)) break;  //Added to get the next length of kmer
 #if SINGLE_BAR
 					if(verbose==0 && nkmers_read==10000)
 					{

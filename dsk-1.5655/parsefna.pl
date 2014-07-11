@@ -15,6 +15,7 @@ while($line=<file>){
 #		$read = join("",$read,substr($line,0,-1));
 		$read = join("",$read,$line);
 	}else{
+	$read=uc($read);
 	if(length($read)-$L >=0) {
 		for($i=0;$i<length($read)-$L+1;$i++){
 			$tmp = substr($read,$i,$L);

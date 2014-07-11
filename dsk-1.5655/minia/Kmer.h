@@ -38,6 +38,7 @@ long seed_lmer(char *seq,int size);
  
 uint64_t revcomp(uint64_t x);
 uint64_t revcomp(uint64_t x, int size);
+int convert_to_int(kmer_type length);
 
 #ifdef _largeint
 LargeInt<KMER_PRECISION> revcomp(LargeInt<KMER_PRECISION> x);
