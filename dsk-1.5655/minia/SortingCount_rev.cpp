@@ -30,7 +30,7 @@ struct kmer_set_t
 // write_count == True: include kmer count in results file, in that form:
 //           - save kmer count for each kmer in the resulting binary file
 //           - the very first four bytes of the result file are the kmer length
-void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_space, bool write_count, int verbose,bool reverse)
+void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_space, bool write_count, int verbose)
 {
 
     // create a temp dir from the prefix
@@ -129,15 +129,7 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
     long * lmers_for_hash = (long * ) malloc(sizeof(long)*pow(4,size_for_reestimation));
     int * partitions_for_lmers =(int * ) malloc(sizeof(int)*pow(4,size_for_reestimation));
     Sequences->count_kmers_for_small_value(size_for_reestimation,lmer_counts);
-    int temp_partition;
-    if(reverse) 
-    {
-    	temp_partition=reestimate_partitions(size_for_reestimation,volume_per_partition,lmer_counts,lmers_for_hash,partitions_for_lmers,2);
-    }else
-    {
-	temp_partition=reestimate_partitions(size_for_reestimation,volume_per_partition,lmer_counts,lmers_for_hash,partitions_for_lmers,1);
-    }
-	
+    int temp_partition=reestimate_partitions(size_for_reestimation,volume_per_partition,lmer_counts,lmers_for_hash,partitions_for_lmers,2);
     unordered_map<long,int> part_hash;
     int total_lmers=pow(4,size_for_reestimation);
     for(int it=0;it<total_lmers;it++)
@@ -265,12 +257,10 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
                 
                 //we have a seq beginning at  pt_begin of size idx  ,without any N, will be treated as a read:
                 binread->write_read(pt_begin,idx);
-		if(reverse) 
-		{
 		revcomp_sequence(pt_begin,idx); // reverse complement the string  //REVERSECOMPLEMENT 
 		binread->write_read(pt_begin,idx); // write reverse complement string //REVERSECOMPLEMENT 
 		revcomp_sequence(pt_begin,idx); // restore the string //REVERSECOMPLEMENT 
-		}
+
 		pt_begin += idx;
             }
             
@@ -636,23 +626,14 @@ void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_s
 	                    				if (abundance >= nks && abundance <= max_couv && length_kmer == Kmerlist[s])
 							{
 								//write if lkmer is the smaller of it and its reverse complement
-								if(reverse)
+								lkmer_revcomp = revcomp(lkmer,length_kmer); //REVERSECOMPLEMENT 
+								if(lkmer < lkmer_revcomp)//REVERSECOMPLEMENT 
 								{
-									lkmer_revcomp = revcomp(lkmer,length_kmer); //REVERSECOMPLEMENT 
-									if(lkmer < lkmer_revcomp)//REVERSECOMPLEMENT 
-									{
-										SolidKmers[s]->write_element_buffered(&(hash->iterator->key),tid);
+								SolidKmers[s]->write_element_buffered(&(hash->iterator->key),tid);
 							
-								 		NbSolid_omp[tid]++;
-										if (write_count)
-											SolidKmers[s]->write_buffered(&abundance, sizeof(abundance),tid, false);
-									}
-								}else
-								{
-										SolidKmers[s]->write_element_buffered(&(hash->iterator->key),tid);
-								 		NbSolid_omp[tid]++;
-										if (write_count)
-											SolidKmers[s]->write_buffered(&abundance, sizeof(abundance),tid, false);
+								 NbSolid_omp[tid]++;
+								if (write_count)
+										SolidKmers[s]->write_buffered(&abundance, sizeof(abundance),tid, false);
 								}
 							}
 		                    			distinct_kmers_per_partition[p]++;

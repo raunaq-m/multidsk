@@ -367,7 +367,7 @@ void Bank::init(char **fname, int nb_files_)
         buffered_file[i]->estimated_filesize = estimated_filesize;
         filesizes += estimated_filesize;
     }
-        printf("Filesize estimated from reads is %llu\n",filesizes );
+    //    printf("Filesize estimated from reads is %llu\n",filesizes );
 
     // open each file for reading
     rewind_all(); // initialize the get_next_seq iterator to the first file
@@ -438,7 +438,7 @@ void Bank::count_kmers_for_small_value(int l, double *lmer_counts)
 		uint64_t multiplication_factor ;
 	if(filesizes > 21474836480 || nb_files>20)
 	{	
-		printf("Limit of files to read %d \n",nb_files/20);
+		//printf("Limit of files to read %d \n",nb_files/20);
 		while(get_next_seq_subset(&rseq,NULL,&readlen,NULL))
 		{
 			//count l-mers from the read and store them in lmer_counts
@@ -520,7 +520,7 @@ void Bank::count_kmers_for_small_value(int l, double *lmer_counts)
 	uint64_t total_partitions=0;
 	//int volume_size = estimate_kmers_volume(sizeKmer);
 	//printf("Total counts is %llu and size is %d \n",total_counts,volume_size);
-	printf("Factor for multiplication %llu\n",multiplication_factor);
+	//printf("Factor for multiplication %llu\n",multiplication_factor);
 	if( multiplication_factor ==0 )
 		multiplication_factor = 1;
 	//printf("Factor for multiplication %llu\n",multiplication_factor);
@@ -621,12 +621,16 @@ uint64_t Bank::reestimate_partitions(int l)
 // estimate the volume of all redundant kmers in the reads, if they were to be stored in 2bits
 uint64_t Bank::estimate_kmers_volume(int k)
 {
+	return estimate_kmers_volume(k,sizeof(kmer_type)*8);
+}
+uint64_t Bank::estimate_kmers_volume(int k, int kmer_nbits)
+{
 
     char * rseq;
     int readlen;
     int NbRead = 0;
     //int kmer_nbits = std::max(64,(int)pow(2,ceilf(log2f(2*k)))); // Bank assumes that a kmer is stored in the smallest integer type (e.g. uint64_t or uint128_t) // not accurate anymore with _ttmath/_largeint
-    int kmer_nbits = sizeof(kmer_type)*8;
+    //int kmer_nbits = sizeof(kmer_type)*8;
     rewind_all();
     uint64_t total_volume = 0;
 

@@ -87,6 +87,7 @@ class Bank{
         ~Bank();
 
         uint64_t estimate_kmers_volume(int k);
+		uint64_t estimate_kmers_volume(int k, int kmer_nbits);
         uint64_t estimate_nb_reads();
         int estimate_max_readlen();
 

@@ -45,14 +45,14 @@ int* loadKmers(char *kmerfname) {
 	return Kmerlist;
 }
 
-int reestimate_partitions(int size_of_lmers,uint64_t partition_volume,double * lkmer_counts, long * hash_vals, int * partition_files)
+int reestimate_partitions(int size_of_lmers,uint64_t partition_volume,double * lkmer_counts, long * hash_vals, int * partition_files,int fact)
 {
 	//Sort the counts using merge sort, and also maintain the positions of sorted numbers
 	vector<clmer> sorted_lmers;
 	long total_bins = pow(4,size_of_lmers);
 	// make pairs of lmercount and lmer 
 	for (int i=0;i<total_bins;i++)
-		sorted_lmers.push_back(make_pair(i,lkmer_counts[i]));
+		sorted_lmers.push_back(make_pair(i,lkmer_counts[i]*fact)); //Factor 2 is for reverse complements//REVERSECOMPLEMENT 
 	// sort the counts of kmers and maintain their index 
 	sort(sorted_lmers.begin(),sorted_lmers.end(),comparator);
 	double current_vol=0; int part = 0, iter=0, items_in_cur = 0;

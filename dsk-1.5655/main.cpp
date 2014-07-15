@@ -39,7 +39,7 @@ int main(int argc, char *argv[])
         fprintf (stderr,"%s: [d]isk [s]treaming of [k]-mers (constant-memory k-mer counting)\n",argv[0]);
         fprintf (stderr,"usage:\n");
         fprintf (stderr," %s input_file kmer_size [-t min_abundance] [-m max_memory] [-d max_disk_space] [-o out_prefix] [-histo]\n",argv[0]);
-        fprintf (stderr,"details:\n [-t min_abundance] filters out k-mers seen ( < min_abundance ) times, default: 1 (all kmers are returned)\n [-m max_memory] is in MB, default: min(total system memory / 2, 5 GB) \n [-d max_disk_space] is in MB, default: min(available disk space / 2, reads file size)\n [-o out_prefix] saves results in [out_prefix].solid_kmers. default out_prefix = basename(input_file)\n [-histo] outputs histogram of kmers abundance\n Input file can be fasta, fastq, gzipped or not, or a file containing a list of file names.\n");
+        fprintf (stderr,"details:\n [-t min_abundance] filters out k-mers seen ( < min_abundance ) times, default: 1 (all kmers are returned)\n [-m max_memory] is in MB, default: min(total system memory / 2, 5 GB) \n [-d max_disk_space] is in MB, default: min(available disk space / 2, reads file size)\n [-o out_prefix] saves results in [out_prefix].solid_kmers. default out_prefix = basename(input_file)\n [-histo] outputs histogram of kmers abundance\n [-rev] outputs only one of forward or reverse complement k-mers\n Input file can be fasta, fastq, gzipped or not, or a file containing a list of file names.\n");
 #ifdef SVN_REV
 fprintf(stderr,"Running dsk version %s\n",STR(SVN_REV));
 #endif
@@ -102,7 +102,7 @@ fprintf(stderr,"Running dsk version %s\n",STR(SVN_REV));
     }
 
     int verbose = 0;
-
+    bool reverse = false;
     max_disk_space = 0;
 
     output_histo =false;
@@ -123,6 +123,9 @@ fprintf(stderr,"Running dsk version %s\n",STR(SVN_REV));
         
         if (strcmp(argv[n_a],"-histo")==0)
             output_histo =true;
+	
+	if (strcmp(argv[n_a],"-rev")==0)
+	    reverse = true;
     }
 
     if (max_memory > total_ram)
@@ -133,7 +136,7 @@ fprintf(stderr,"Running dsk version %s\n",STR(SVN_REV));
 
     STARTWALL(0);
 
-    sorting_count(Reads,prefix,max_memory,max_disk_space,true,verbose);
+    sorting_count(Reads,prefix,max_memory,max_disk_space,true,verbose,reverse);
 
     STOPWALL(0,"Total");
 

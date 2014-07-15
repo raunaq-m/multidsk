@@ -23,6 +23,6 @@
 using namespace std;
 
 typedef uint32_t uint_abundance_t;
-void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_space, bool write_count, int verbose);
+void sorting_count(Bank *Sequences, char *prefix, int max_memory, int max_disk_space, bool write_count, int verbose, bool reverse);
 
 #endif
